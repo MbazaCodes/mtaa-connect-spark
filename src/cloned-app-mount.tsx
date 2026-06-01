@@ -1,10 +1,14 @@
 import { useEffect, useState, type ComponentType } from "react";
-import { Buffer } from "buffer";
 
-// Polyfills required by @react-pdf/renderer & similar (browser-only)
-if (typeof window !== "undefined") {
-  (window as unknown as { Buffer?: typeof Buffer }).Buffer = Buffer;
-  (window as unknown as { global?: Window }).global = window;
+// Client-only polyfills required by some browser libs (e.g. @react-pdf/renderer)
+async function installBrowserPolyfills() {
+  if (typeof window === "undefined") return;
+  const w = window as unknown as { Buffer?: unknown; global?: Window };
+  if (!w.Buffer) {
+    const { Buffer } = await import("buffer/");
+    w.Buffer = Buffer;
+  }
+  w.global = window;
   if (typeof crypto !== "undefined" && !crypto.randomUUID) {
     (crypto as Crypto & { randomUUID: () => `${string}-${string}-${string}-${string}-${string}` })
       .randomUUID = function () {
@@ -29,7 +33,7 @@ export function ClonedApp() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
+    installBrowserPolyfills().then(() => Promise.all([
       import("@/clone-app"),
       import("@/context/LanguageContext"),
       import("@/context/AuthContext"),
@@ -42,7 +46,7 @@ export function ClonedApp() {
         AuthProvider: auth.AuthProvider,
         ToastProvider: toast.ToastProvider,
       });
-    });
+    }));
     return () => {
       cancelled = true;
     };
