@@ -46,7 +46,7 @@ export function ClonedApp() {
         AuthProvider: auth.AuthProvider,
         ToastProvider: toast.ToastProvider,
       });
-    });
+    }));
     return () => {
       cancelled = true;
     };
