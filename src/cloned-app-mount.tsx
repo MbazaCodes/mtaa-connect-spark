@@ -33,7 +33,7 @@ export function ClonedApp() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
+    installBrowserPolyfills().then(() => Promise.all([
       import("@/clone-app"),
       import("@/context/LanguageContext"),
       import("@/context/AuthContext"),
