@@ -158,7 +158,7 @@ export function AdminLogs() {
 
   // Auto-refresh
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const refreshInterval = useRef<NodeJS.Timeout>();
+  const refreshInterval = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const uniqueUsers = useMemo(() => {
     const users = new Map();
