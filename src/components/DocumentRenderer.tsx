@@ -13,8 +13,12 @@ import { X, Download, ExternalLink, Loader2 } from 'lucide-react';
 import { UtambulishoMkaziPDF }    from './documents/UtambulishoMkaziPDF';
 import { KibariMazishiPDF }       from './documents/KibariMazishiPDF';
 import { KibariSherehePDF }       from './documents/KibariSherehePDF';
+import { KibariUjeziMdogoPDF }    from './documents/KibariUjeziMdogoPDF';
+import { BaruaUtambulishoPDF }    from './documents/BaruaUtambulishoPDF';
 import { MakubalianoMauzianoPDF } from './documents/MakubalianoMauzianoPDF';
+import { MakubalianoPangoPDF }    from './documents/MakubalianoPangoPDF';
 import { RisitiMalipoPDF }        from './documents/RisitiMalipoPDF';
+import { MgogoroMashauriPDF }     from './documents/MgogoroMashauriPDF';
 
 // Map service_id / name keywords to PDF component + service code
 type PDFFactory = {
@@ -27,16 +31,41 @@ function resolvePDF(application: Application): PDFFactory {
   const name = (application.service_name || '').toUpperCase();
   const id   = String(application.service_id || '');
 
-  if (id === '1' || name.includes('MKAZI') || name.includes('UTAMBULISHO'))
+  // Service 1 — Utambulisho wa Mkazi (Resident Identity)
+  if (id === '1' || name.includes('MKAZI') || name.includes('UTAMBULISHO WA'))
     return { Component: UtambulishoMkaziPDF, code: 'MKZ', filenamePrefix: 'cheti-mkazi' };
+
+  // Service 2 — Kibari cha Mazishi (Burial Permit)
   if (id === '2' || name.includes('MAZISHI'))
     return { Component: KibariMazishiPDF, code: 'MAZ', filenamePrefix: 'kibari-mazishi' };
-  if (id === '3' || name.includes('SHEREHE') || name.includes('TUKIO'))
+
+  // Service 3 — Kibari cha Sherehe (Celebration Permit)
+  if (id === '3' || name.includes('SHEREHE'))
     return { Component: KibariSherehePDF, code: 'KIB', filenamePrefix: 'kibari-sherehe' };
-  if (id === '4' || name.includes('RISITI') || name.includes('RECEIPT'))
-    return { Component: RisitiMalipoPDF, code: 'RCP', filenamePrefix: 'risiti-malipo' };
-  if (id === '5' || id === '6' || name.includes('MAUZIANO') || name.includes('PANGO') || name.includes('MAKUBALIANO'))
-    return { Component: MakubalianoMauzianoPDF, code: 'MUZ', filenamePrefix: 'makubaliano' };
+
+  // Service 4 — Kibari cha Ujezi Mdogo (Construction Permit)
+  if (id === '4' || name.includes('UJEZI') || name.includes('CONSTRUCTION'))
+    return { Component: KibariUjeziMdogoPDF, code: 'CP', filenamePrefix: 'kibari-ujezi' };
+
+  // Service 5 — Barua ya Utambulisho (Introduction Letter)
+  if (id === '5' || name.includes('BARUA'))
+    return { Component: BaruaUtambulishoPDF, code: 'IL', filenamePrefix: 'barua-utambulisho' };
+
+  // Service 6 — Makubaliano ya Mauzo (Sales Agreement)
+  if (id === '6' || name.includes('MAUZO'))
+    return { Component: MakubalianoMauzianoPDF, code: 'SA', filenamePrefix: 'makubaliano-mauzo' };
+
+  // Service 7 — Makubaliano ya Pango (Rental Agreement)
+  if (id === '7' || name.includes('PANGO'))
+    return { Component: MakubalianoPangoPDF, code: 'RA', filenamePrefix: 'makubaliano-pango' };
+
+  // Service 8 — Malipo na Michango (Payments & Contributions)
+  if (id === '8' || name.includes('MALIPO') || name.includes('MICHANGO'))
+    return { Component: RisitiMalipoPDF, code: 'PY', filenamePrefix: 'risiti-malipo' };
+
+  // Service 9 — Migogoro na Mashauri (Disputes & Issues)
+  if (id === '9' || name.includes('MIGOGORO') || name.includes('MASHAURI'))
+    return { Component: MgogoroMashauriPDF, code: 'DS', filenamePrefix: 'taarifa-mgogoro' };
 
   // Default: receipt-style fallback
   return { Component: RisitiMalipoPDF, code: 'DOC', filenamePrefix: 'hati' };

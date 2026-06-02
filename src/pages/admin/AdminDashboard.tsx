@@ -149,6 +149,10 @@ export function AdminDashboard({ setView }: { setView?: (view: string) => void }
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'year'>('month');
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'reports'>('overview');
 
+  // Service-level analytics
+  const [serviceCounts, setServiceCounts] = useState<Record<string, { total: number; approved: number; pending: number; rejected: number }>>({});
+  const [businessStats, setBusinessStats] = useState<{ sellers: number; landlords: number; brokers: number; pending: number }>({ sellers: 0, landlords: 0, brokers: 0, pending: 0 });
+
   const applicationSuccessRate = useMemo(() => {
     if (stats.totalApplications === 0) return 0;
     return ((stats.approvedApplications / stats.totalApplications) * 100).toFixed(1);
@@ -368,6 +372,38 @@ export function AdminDashboard({ setView }: { setView?: (view: string) => void }
       
       // Fetch recent activities
       await fetchRecentActivities();
+
+      // Service-level analytics — count applications per service
+      try {
+        const { data: serviceApps } = await supabase
+          .from('applications')
+          .select('service_name, status');
+        if (serviceApps) {
+          const counts: Record<string, { total: number; approved: number; pending: number; rejected: number }> = {};
+          for (const a of serviceApps) {
+            const sn = a.service_name || 'Unknown';
+            if (!counts[sn]) counts[sn] = { total: 0, approved: 0, pending: 0, rejected: 0 };
+            counts[sn].total++;
+            if (['approved', 'issued'].includes(a.status)) counts[sn].approved++;
+            else if (['submitted', 'pending_review', 'pending_payment', 'paid', 'verified'].includes(a.status)) counts[sn].pending++;
+            else if (a.status === 'rejected') counts[sn].rejected++;
+          }
+          setServiceCounts(counts);
+        }
+
+        // Business registration stats
+        const { data: bizRegs } = await supabase
+          .from('business_registrations')
+          .select('business_type, status');
+        if (bizRegs) {
+          setBusinessStats({
+            sellers: bizRegs.filter(r => r.business_type === 'seller' && r.status === 'approved').length,
+            landlords: bizRegs.filter(r => r.business_type === 'landlord' && r.status === 'approved').length,
+            brokers: bizRegs.filter(r => r.business_type === 'broker' && r.status === 'approved').length,
+            pending: bizRegs.filter(r => r.status === 'pending').length,
+          });
+        }
+      } catch (e) { console.warn('analytics fetch error:', e); }
       
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -948,22 +984,97 @@ export function AdminDashboard({ setView }: { setView?: (view: string) => void }
             </div>
           </div>
 
-          {/* Service Breakdown */}
+          {/* Service Breakdown — Real Application Data */}
           <div className="bg-white rounded-4xl p-8 border border-stone-100 shadow-xl">
             <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
               <PieChart size={20} className="text-emerald-600" />
-              {lang === 'sw' ? 'Mgawanyo wa Huduma' : 'Service Breakdown'}
+              {lang === 'sw' ? 'Mgawanyo wa Huduma kwa Maombi' : 'Service Breakdown by Applications'}
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {HARDCODED_SERVICES.slice(0, 6).map((service, index) => (
-                <div key={service.id} className="flex items-center justify-between p-4 bg-stone-50 rounded-2xl">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-4 h-4 rounded-full ${serviceColorClasses[index] || 'bg-stone-400'}`}></div>
-                    <span className="font-medium text-stone-700">{lang === 'sw' ? service.name : (service.name_en || service.name)}</span>
+            <div className="space-y-3">
+              {HARDCODED_SERVICES.map((service, index) => {
+                const counts = serviceCounts[service.name] || { total: 0, approved: 0, pending: 0, rejected: 0 };
+                const maxTotal = Math.max(1, ...Object.values(serviceCounts).map(c => c.total));
+                const barWidth = (counts.total / maxTotal) * 100;
+                const serviceIcons = ['🪪', '🕊', '🎉', '🏗', '📝', '🤝', '🔑', '💰', '⚖'];
+                return (
+                  <div key={service.id} className="group">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{serviceIcons[index] || '📋'}</span>
+                        <span className="text-sm font-medium text-stone-700 group-hover:text-stone-900">
+                          {lang === 'sw' ? service.name : (service.name_en || service.name)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="font-bold text-stone-900">{counts.total}</span>
+                        <span className="text-emerald-600 font-bold">{counts.approved} ✓</span>
+                        {counts.pending > 0 && <span className="text-amber-600 font-bold">{counts.pending} ⏳</span>}
+                        {counts.rejected > 0 && <span className="text-red-500 font-bold">{counts.rejected} ✗</span>}
+                      </div>
+                    </div>
+                    <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full flex">
+                        {counts.approved > 0 && (
+                          <div className="bg-emerald-500 h-full" style={{ width: `${(counts.approved / maxTotal) * 100}%` }} />
+                        )}
+                        {counts.pending > 0 && (
+                          <div className="bg-amber-400 h-full" style={{ width: `${(counts.pending / maxTotal) * 100}%` }} />
+                        )}
+                        {counts.rejected > 0 && (
+                          <div className="bg-red-400 h-full" style={{ width: `${(counts.rejected / maxTotal) * 100}%` }} />
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <span className="font-bold text-stone-900">{formatCurrency(service.fee, currency)}</span>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-4 mt-4 pt-4 border-t border-stone-100 text-xs text-stone-500">
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-emerald-500"></div> {lang === 'sw' ? 'Imeidhinishwa' : 'Approved'}</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-amber-400"></div> {lang === 'sw' ? 'Inaendelea' : 'In Progress'}</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-red-400"></div> {lang === 'sw' ? 'Imekataliwa' : 'Rejected'}</div>
+            </div>
+          </div>
+
+          {/* Business Registrations + Revenue by Service */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-4xl p-8 border border-stone-100 shadow-xl">
+              <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
+                <Building2 size={20} className="text-emerald-600" />
+                {lang === 'sw' ? 'Usajili wa Biashara' : 'Business Registrations'}
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🏪</span>
+                    <span className="font-medium text-stone-600">{lang === 'sw' ? 'Wauzaji Waliothibitishwa' : 'Verified Sellers'}</span>
+                  </div>
+                  <span className="font-bold text-blue-600 text-xl">{businessStats.sellers}</span>
                 </div>
-              ))}
+                <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🔑</span>
+                    <span className="font-medium text-stone-600">{lang === 'sw' ? 'Wapangishaji Waliothibitishwa' : 'Verified Landlords'}</span>
+                  </div>
+                  <span className="font-bold text-emerald-600 text-xl">{businessStats.landlords}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-purple-50 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">👥</span>
+                    <span className="font-medium text-stone-600">{lang === 'sw' ? 'Madalali Waliothibitishwa' : 'Verified Brokers'}</span>
+                  </div>
+                  <span className="font-bold text-purple-600 text-xl">{businessStats.brokers}</span>
+                </div>
+                {businessStats.pending > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">⏳</span>
+                      <span className="font-medium text-stone-600">{lang === 'sw' ? 'Maombi Yanayosubiri' : 'Pending Applications'}</span>
+                    </div>
+                    <span className="font-bold text-amber-600 text-xl animate-pulse">{businessStats.pending}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
