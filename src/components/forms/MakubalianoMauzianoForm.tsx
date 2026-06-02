@@ -1,1843 +1,660 @@
 /**
- * Makubaliano ya Mauziano Form
- * Sale/Lease Agreement Form
- * 
- * Service: Makubaliano ya Mauziano
- * Fee: 3% of transaction value (min 5,000 TZS, max 500,000 TZS)
+ * Makubaliano ya Mauzo — Sales Agreement Form
+ * Logic: Seller (logged-in) pulls Buyer by NIDA/phone.
+ * Both must be registered & approved citizens.
+ * After admin approval, both receive a copy.
+ *
+ * Fee: 3% of sale value (min TSh 5,000, max TSh 500,000)
+ * Color: Blue/indigo
  */
-import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { 
-  Loader2, CheckCircle, ArrowLeft, ArrowRight, Eye, FileCheck, 
-  Home, User, Users, FileSignature, Search, Upload, FileText, X,
-  MapPin, DollarSign, Calendar, CreditCard, Phone, Mail, Bell, 
-  Shield, Info, TrendingUp, AlertCircle, Grid, CheckSquare, Building
+import React, { useState, useRef, useCallback } from 'react';
+import {
+  Loader2, CheckCircle, CheckCircle2, ArrowLeft, ArrowRight,
+  Eye, FileCheck, User, Users, AlertCircle, Shield, Info,
+  Upload, X, Edit2, FileText, Check, Search, Home, MapPin,
+  DollarSign, Calendar, FileSignature, UserCheck, UserX
 } from 'lucide-react';
 import { FormProps, labels } from './types';
+import { ProgressFill } from '../ui/ProgressFill';
 import { supabase } from '../../lib/supabase';
 
-// Fee constants
-const MIN_FEE = 5000;
-const MAX_FEE = 500000;
-const FEE_PERCENTAGE = 0.03;
+// ─── Fee calculator ──────────────────────────────────────────────────────────
+const FEE_RATE = 0.03;
+const MIN_FEE  = 5000;
+const MAX_FEE  = 500000;
+const calcFee  = (value: number) => Math.min(MAX_FEE, Math.max(MIN_FEE, Math.round(value * FEE_RATE)));
 
-// Asset type options
+// ─── Constants ───────────────────────────────────────────────────────────────
 const ASSET_TYPES = [
-  { label: 'Nyumba / House', value: 'HOUSE' },
-  { label: 'Gari / Vehicle', value: 'VEHICLE' },
-  { label: 'Ardhi / Land', value: 'LAND' },
-  { label: 'Biashara / Business', value: 'BUSINESS' },
-  { label: 'Vifaa / Equipment', value: 'EQUIPMENT' },
-  { label: 'Nyingine / Other', value: 'OTHER' },
+  { label: 'Nyumba (Residential House)', value: 'HOUSE' },
+  { label: 'Ghorofa / Apartment (Apartment)', value: 'APARTMENT' },
+  { label: 'Ardhi / Kiwanja (Land / Plot)', value: 'LAND' },
+  { label: 'Gari / Pikipiki (Vehicle / Motorcycle)', value: 'VEHICLE' },
+  { label: 'Biashara (Business / Going Concern)', value: 'BUSINESS' },
+  { label: 'Vifaa / Samani (Equipment / Furniture)', value: 'EQUIPMENT' },
+  { label: 'Mifugo (Livestock)', value: 'LIVESTOCK' },
+  { label: 'Nyingine (Other)', value: 'OTHER' },
 ];
 
-// Currency options
-const CURRENCY_OPTIONS = [
-  { label: 'TZS - Shilingi ya Tanzania', value: 'TZS' },
-  { label: 'USD - Dola ya Marekani', value: 'USD' },
-  { label: 'EUR - Euro', value: 'EUR' },
-];
-
-// Payment terms
 const PAYMENT_TERMS = [
-  { label: 'Malipo Kamili / Full Payment', value: 'FULL' },
-  { label: 'Awamu / Installments', value: 'INSTALLMENTS' },
-  { label: 'Kodi ya Mwezi / Monthly Rent', value: 'MONTHLY_RENT' },
-  { label: 'Kodi ya Mwaka / Annual Rent', value: 'ANNUAL_RENT' },
+  { label: 'Malipo Kamili Mara Moja (Full Payment — Lump Sum)', value: 'FULL' },
+  { label: 'Awamu — Sehemu ya Kwanza + Malipo ya Baadaye (Installments)', value: 'INSTALLMENTS' },
+  { label: 'Sehemu ya Kwanza + Mkopo wa Benki (Deposit + Bank Loan)', value: 'DEPOSIT_LOAN' },
+  { label: 'Mkataba wa Kipindi (Deferred Payment)', value: 'DEFERRED' },
 ];
 
-// Tanzania Regions
-const TANZANIA_REGIONS = [
-  { label: 'Arusha', value: 'ARUSHA' },
-  { label: 'Dar es Salaam', value: 'DAR_ES_SALAAM' },
-  { label: 'Dodoma', value: 'DODOMA' },
-  { label: 'Geita', value: 'GEITA' },
-  { label: 'Iringa', value: 'IRINGA' },
-  { label: 'Kagera', value: 'KAGERA' },
-  { label: 'Katavi', value: 'KATAVI' },
-  { label: 'Kigoma', value: 'KIGOMA' },
-  { label: 'Kilimanjaro', value: 'KILIMANJARO' },
-  { label: 'Lindi', value: 'LINDI' },
-  { label: 'Manyara', value: 'MANYARA' },
-  { label: 'Mara', value: 'MARA' },
-  { label: 'Mbeya', value: 'MBEYA' },
-  { label: 'Morogoro', value: 'MOROGORO' },
-  { label: 'Mtwara', value: 'MTWARA' },
-  { label: 'Mwanza', value: 'MWANZA' },
-  { label: 'Njombe', value: 'NJOMBE' },
-  { label: 'Pwani', value: 'PWANI' },
-  { label: 'Rukwa', value: 'RUKWA' },
-  { label: 'Ruvuma', value: 'RUVUMA' },
-  { label: 'Shinyanga', value: 'SHINYANGA' },
-  { label: 'Simiyu', value: 'SIMIYU' },
-  { label: 'Singida', value: 'SINGIDA' },
-  { label: 'Songwe', value: 'SONGWE' },
-  { label: 'Tabora', value: 'TABORA' },
-  { label: 'Tanga', value: 'TANGA' },
-];
+const ALLOWED_DOCS = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const MAX_DOC_SIZE = 10 * 1024 * 1024;
 
-// Districts by Region
-const DISTRICTS_BY_REGION: Record<string, { label: string; value: string }[]> = {
-  ARUSHA: [
-    { label: 'Arusha City', value: 'ARUSHA_CITY' },
-    { label: 'Arusha Rural', value: 'ARUSHA_RURAL' },
-    { label: 'Karatu', value: 'KARATU' },
-    { label: 'Longido', value: 'LONGIDO' },
-    { label: 'Monduli', value: 'MONDULI' },
-    { label: 'Ngorongoro', value: 'NGORONGORO' },
-  ],
-  DAR_ES_SALAAM: [
-    { label: 'Ilala', value: 'ILALA' },
-    { label: 'Kinondoni', value: 'KINONDONI' },
-    { label: 'Ubungo', value: 'UBUNGO' },
-    { label: 'Kigamboni', value: 'KIGAMBONI' },
-    { label: 'Temeke', value: 'TEMEKE' },
-  ],
-  DODOMA: [
-    { label: 'Dodoma City', value: 'DODOMA_CITY' },
-    { label: 'Bahi', value: 'BAHI' },
-    { label: 'Chamwino', value: 'CHAMWINO' },
-    { label: 'Chemba', value: 'CHEMBA' },
-    { label: 'Kondoa', value: 'KONDOA' },
-    { label: 'Kongwa', value: 'KONGWA' },
-    { label: 'Mpwapwa', value: 'MPWAPWA' },
-  ],
-  GEITA: [
-    { label: 'Geita Town', value: 'GEITA_TOWN' },
-    { label: 'Bukombe', value: 'BUKOMBE' },
-    { label: 'Chato', value: 'CHATO' },
-    { label: 'Mbogwe', value: 'MBOGWE' },
-    { label: 'Nyang\'hwale', value: 'NYANG_HWALE' },
-  ],
-  IRINGA: [
-    { label: 'Iringa City', value: 'IRINGA_CITY' },
-    { label: 'Iringa Rural', value: 'IRINGA_RURAL' },
-    { label: 'Kilolo', value: 'KILOLO' },
-    { label: 'Mafinga', value: 'MAFINGA' },
-  ],
-  KAGERA: [
-    { label: 'Bukoba Urban', value: 'BUKOBA_URBAN' },
-    { label: 'Bukoba Rural', value: 'BUKOBA_RURAL' },
-    { label: 'Biharamulo', value: 'BIHARAMULO' },
-    { label: 'Karagwe', value: 'KARAGWE' },
-    { label: 'Kyerwa', value: 'KYERWA' },
-    { label: 'Missenyi', value: 'MISSENYI' },
-    { label: 'Muleba', value: 'MULEBA' },
-    { label: 'Ngara', value: 'NGARA' },
-  ],
-  KATAVI: [
-    { label: 'Mpanda Town', value: 'MPANDA_TOWN' },
-    { label: 'Mpanda Rural', value: 'MPANDA_RURAL' },
-    { label: 'Mlele', value: 'MLELE' },
-    { label: 'Tanganyika', value: 'TANGANYIKA' },
-  ],
-  KIGOMA: [
-    { label: 'Kigoma Urban', value: 'KIGOMA_URBAN' },
-    { label: 'Kigoma Rural', value: 'KIGOMA_RURAL' },
-    { label: 'Buhigwe', value: 'BUHIGWE' },
-    { label: 'Kakonko', value: 'KAKONKO' },
-    { label: 'Kasulu Town', value: 'KASULU_TOWN' },
-    { label: 'Kasulu Rural', value: 'KASULU_RURAL' },
-    { label: 'Kibondo', value: 'KIBONDO' },
-    { label: 'Uvinza', value: 'UVINZA' },
-  ],
-  KILIMANJARO: [
-    { label: 'Moshi Urban', value: 'MOSHI_URBAN' },
-    { label: 'Moshi Rural', value: 'MOSHI_RURAL' },
-    { label: 'Hai', value: 'HAI' },
-    { label: 'Mwanga', value: 'MWANGA' },
-    { label: 'Rombo', value: 'ROMBO' },
-    { label: 'Same', value: 'SAME' },
-    { label: 'Siha', value: 'SIHA' },
-  ],
-  LINDI: [
-    { label: 'Lindi Urban', value: 'LINDI_URBAN' },
-    { label: 'Lindi Rural', value: 'LINDI_RURAL' },
-    { label: 'Kilwa', value: 'KILWA' },
-    { label: 'Liwale', value: 'LIWALE' },
-    { label: 'Nachingwea', value: 'NACHINGWEA' },
-    { label: 'Ruangwa', value: 'RUANGWA' },
-  ],
-  MANYARA: [
-    { label: 'Babati Urban', value: 'BABATI_URBAN' },
-    { label: 'Babati Rural', value: 'BABATI_RURAL' },
-    { label: 'Hanang', value: 'HANANG' },
-    { label: 'Kiteto', value: 'KITETO' },
-    { label: 'Mbulu', value: 'MBULU' },
-    { label: 'Simanjiro', value: 'SIMANJIRO' },
-  ],
-  MARA: [
-    { label: 'Musoma Urban', value: 'MUSOMA_URBAN' },
-    { label: 'Musoma Rural', value: 'MUSOMA_RURAL' },
-    { label: 'Bunda', value: 'BUNDA' },
-    { label: 'Butiama', value: 'BUTIAMA' },
-    { label: 'Rorya', value: 'RORYA' },
-    { label: 'Serengeti', value: 'SERENGETI' },
-    { label: 'Tarime', value: 'TARIME' },
-  ],
-  MBEYA: [
-    { label: 'Mbeya City', value: 'MBEYA_CITY' },
-    { label: 'Mbeya Rural', value: 'MBEYA_RURAL' },
-    { label: 'Busokelo', value: 'BUSOKELO' },
-    { label: 'Chunya', value: 'CHUNYA' },
-    { label: 'Kyela', value: 'KYELA' },
-    { label: 'Mbarali', value: 'MBARALI' },
-    { label: 'Rungwe', value: 'RUNGWE' },
-  ],
-  MOROGORO: [
-    { label: 'Morogoro Urban', value: 'MOROGORO_URBAN' },
-    { label: 'Morogoro Rural', value: 'MOROGORO_RURAL' },
-    { label: 'Gairo', value: 'GAIRO' },
-    { label: 'Kilosa', value: 'KILOSA' },
-    { label: 'Malinyi', value: 'MALINYI' },
-    { label: 'Mlimba', value: 'MLIMBA' },
-    { label: 'Mvomero', value: 'MVOMERO' },
-    { label: 'Ulanga', value: 'ULANGA' },
-  ],
-  MTWARA: [
-    { label: 'Mtwara Urban', value: 'MTWARA_URBAN' },
-    { label: 'Mtwara Rural', value: 'MTWARA_RURAL' },
-    { label: 'Masasi Town', value: 'MASASI_TOWN' },
-    { label: 'Masasi Rural', value: 'MASASI_RURAL' },
-    { label: 'Nanyumbu', value: 'NANYUMBU' },
-    { label: 'Newala', value: 'NEWALA' },
-    { label: 'Tandahimba', value: 'TANDAHIMBA' },
-  ],
-  MWANZA: [
-    { label: 'Mwanza City', value: 'MWANZA_CITY' },
-    { label: 'Ilemela', value: 'ILEMELA' },
-    { label: 'Kwimba', value: 'KWIMBA' },
-    { label: 'Magu', value: 'MAGU' },
-    { label: 'Misungwi', value: 'MISUNGWI' },
-    { label: 'Nyamagana', value: 'NYAMAGANA' },
-    { label: 'Sengerema', value: 'SENGEREMA' },
-    { label: 'Ukerewe', value: 'UKEREWE' },
-  ],
-  NJOMBE: [
-    { label: 'Njombe Town', value: 'NJOMBE_TOWN' },
-    { label: 'Njombe Rural', value: 'NJOMBE_RURAL' },
-    { label: 'Ludewa', value: 'LUDEWA' },
-    { label: 'Makambako', value: 'MAKAMBAKO' },
-    { label: 'Makete', value: 'MAKETE' },
-    { label: 'Wanging\'ombe', value: 'WANGING_OMBE' },
-  ],
-  PWANI: [
-    { label: 'Kibaha Town', value: 'KIBAHA_TOWN' },
-    { label: 'Kibaha Rural', value: 'KIBAHA_RURAL' },
-    { label: 'Bagamoyo', value: 'BAGAMOYO' },
-    { label: 'Chalinze', value: 'CHALINZE' },
-    { label: 'Kibiti', value: 'KIBITI' },
-    { label: 'Kisarawe', value: 'KISARAWE' },
-    { label: 'Mafia', value: 'MAFIA' },
-    { label: 'Mkuranga', value: 'MKURANGA' },
-    { label: 'Rufiji', value: 'RUFIJI' },
-  ],
-  RUKWA: [
-    { label: 'Sumbawanga Urban', value: 'SUMBAWANGA_URBAN' },
-    { label: 'Sumbawanga Rural', value: 'SUMBAWANGA_RURAL' },
-    { label: 'Kalambo', value: 'KALAMBO' },
-    { label: 'Nkasi', value: 'NKASI' },
-  ],
-  RUVUMA: [
-    { label: 'Songea Urban', value: 'SONGEA_URBAN' },
-    { label: 'Songea Rural', value: 'SONGEA_RURAL' },
-    { label: 'Mbinga', value: 'MBINGA' },
-    { label: 'Namtumbo', value: 'NAMTUMBO' },
-    { label: 'Nyasa', value: 'NYASA' },
-    { label: 'Tunduru', value: 'TUNDURU' },
-  ],
-  SHINYANGA: [
-    { label: 'Shinyanga Urban', value: 'SHINYANGA_URBAN' },
-    { label: 'Shinyanga Rural', value: 'SHINYANGA_RURAL' },
-    { label: 'Kahama Town', value: 'KAHAMA_TOWN' },
-    { label: 'Kahama Rural', value: 'KAHAMA_RURAL' },
-    { label: 'Kishapu', value: 'KISHAPU' },
-    { label: 'Msalala', value: 'MSALALA' },
-    { label: 'Ushetu', value: 'USHETU' },
-  ],
-  SIMIYU: [
-    { label: 'Bariadi Town', value: 'BARIADI_TOWN' },
-    { label: 'Bariadi Rural', value: 'BARIADI_RURAL' },
-    { label: 'Busega', value: 'BUSEGA' },
-    { label: 'Itilima', value: 'ITILIMA' },
-    { label: 'Maswa', value: 'MASWA' },
-    { label: 'Meatu', value: 'MEATU' },
-  ],
-  SINGIDA: [
-    { label: 'Singida Urban', value: 'SINGIDA_URBAN' },
-    { label: 'Singida Rural', value: 'SINGIDA_RURAL' },
-    { label: 'Ikungi', value: 'IKUNGI' },
-    { label: 'Iramba', value: 'IRAMBA' },
-    { label: 'Manyoni', value: 'MANYONI' },
-    { label: 'Mkalama', value: 'MKALAMA' },
-  ],
-  SONGWE: [
-    { label: 'Vwawa', value: 'VWAWA' },
-    { label: 'Ileje', value: 'ILEJE' },
-    { label: 'Mbozi', value: 'MBOZI' },
-    { label: 'Momba', value: 'MOMBA' },
-    { label: 'Songwe', value: 'SONGWE' },
-    { label: 'Tunduma', value: 'TUNDUMA' },
-  ],
-  TABORA: [
-    { label: 'Tabora Urban', value: 'TABORA_URBAN' },
-    { label: 'Tabora Rural', value: 'TABORA_RURAL' },
-    { label: 'Igunga', value: 'IGUNGA' },
-    { label: 'Kaliua', value: 'KALIUA' },
-    { label: 'Nzega', value: 'NZEGA' },
-    { label: 'Sikonge', value: 'SIKONGE' },
-    { label: 'Urambo', value: 'URAMBO' },
-  ],
-  TANGA: [
-    { label: 'Tanga City', value: 'TANGA_CITY' },
-    { label: 'Handeni Town', value: 'HANDENI_TOWN' },
-    { label: 'Handeni Rural', value: 'HANDENI_RURAL' },
-    { label: 'Kilindi', value: 'KILINDI' },
-    { label: 'Korogwe Town', value: 'KOROGWE_TOWN' },
-    { label: 'Korogwe Rural', value: 'KOROGWE_RURAL' },
-    { label: 'Lushoto', value: 'LUSHOTO' },
-    { label: 'Mkinga', value: 'Mkinga' },
-    { label: 'Muheza', value: 'MUHEZA' },
-    { label: 'Pangani', value: 'PANGANI' },
-  ],
-};
+type Step = 'seller' | 'buyer' | 'asset' | 'terms' | 'preview';
 
-// Wards by District (simplified - add more as needed)
-const WARDS_BY_DISTRICT: Record<string, { label: string; value: string }[]> = {
-  // Dar es Salaam - Ilala
-  ILALA: [
-    { label: 'Buguruni', value: 'BUGURUNI' },
-    { label: 'Chanika', value: 'CHANIKA' },
-    { label: 'Gerezani', value: 'GEREZANI' },
-    { label: 'Ilala', value: 'ILALA' },
-    { label: 'Jangwani', value: 'JANGWANI' },
-    { label: 'Kariakoo', value: 'KARIAKOO' },
-    { label: 'Kipawa', value: 'KIPAWA' },
-    { label: 'Kitunda', value: 'KITUNDA' },
-    { label: 'Kisutu', value: 'KISUTU' },
-    { label: 'Mchafukoge', value: 'MCHAFUKOGE' },
-    { label: 'Mchikichini', value: 'MCHIKICHINI' },
-    { label: 'Msongola', value: 'MSONGOLA' },
-    { label: 'Pugu', value: 'PUGU' },
-    { label: 'Tabata', value: 'TABATA' },
-    { label: 'Upanga Magharibi', value: 'UPANGA_MAGHARIBI' },
-    { label: 'Upanga Mashariki', value: 'UPANGA_MASHARIKI' },
-    { label: 'Vingunguti', value: 'VINGUNGUTI' },
-  ],
-  KINONDONI: [
-    { label: 'Bunju', value: 'BUNJU' },
-    { label: 'Hananasif', value: 'HANANASIF' },
-    { label: 'Kawe', value: 'KAWE' },
-    { label: 'Kibamba', value: 'KIBAMBA' },
-    { label: 'Kijitonyama', value: 'KIJITONYAMA' },
-    { label: 'Kunduchi', value: 'KUNDUCHI' },
-    { label: 'Mabibo', value: 'MABIBO' },
-    { label: 'Magogoni', value: 'MAGOGONI' },
-    { label: 'Makongo', value: 'MAKONGO' },
-    { label: 'Makumbusho', value: 'MAKUMBUSHO' },
-    { label: 'Manzese', value: 'MANZESE' },
-    { label: 'Mbezi', value: 'MBEZI' },
-    { label: 'Mikocheni', value: 'MIKOCHENI' },
-    { label: 'Msasani', value: 'MSASANI' },
-    { label: 'Mwananyamala', value: 'MWANANYAMALA' },
-    { label: 'Ndugumbi', value: 'NDUGUMBI' },
-    { label: 'Sinza', value: 'SINZA' },
-    { label: 'Tandale', value: 'TANDALE' },
-  ],
-  UBUNGO: [
-    { label: 'Goba', value: 'GOBA' },
-    { label: 'Kimara', value: 'KIMARA' },
-    { label: 'Kibamba', value: 'KIBAMBA' },
-    { label: 'Kwembe', value: 'KWEMBE' },
-    { label: 'Makuburi', value: 'MAKUBURI' },
-    { label: 'Mbezi Juu', value: 'MBEZI_JUU' },
-    { label: 'Msigani', value: 'MSIGANI' },
-    { label: 'Saranga', value: 'SARANGA' },
-    { label: 'Sinza', value: 'SINZA' },
-    { label: 'Ubungo', value: 'UBUNGO' },
-  ],
-  TEMEKE: [
-    { label: 'Azimio', value: 'AZIMIO' },
-    { label: 'Chamazi', value: 'CHAMAZI' },
-    { label: 'Keko', value: 'KEKO' },
-    { label: 'Kiburugwa', value: 'KIBURUGWA' },
-    { label: 'Kijichi', value: 'KIJICHI' },
-    { label: 'Makangarawe', value: 'MAKANGARAWE' },
-    { label: 'Mbagala', value: 'MBAGALA' },
-    { label: 'Mbagala Kuu', value: 'MBAGALA_KUU' },
-    { label: 'Mianzini', value: 'MIANZINI' },
-    { label: 'Miburani', value: 'MIBURANI' },
-    { label: 'Mjimwema', value: 'MJIMWEMA' },
-    { label: 'Mtoni', value: 'MTONI' },
-    { label: 'Sandali', value: 'SANDALI' },
-    { label: 'Tandika', value: 'TANDIKA' },
-    { label: 'Temeke', value: 'TEMEKE' },
-    { label: 'Toangoma', value: 'TOANGOMA' },
-    { label: 'Yombo Vituka', value: 'YOMBO_VITUKA' },
-  ],
-  KIGAMBONI: [
-    { label: 'Kigamboni', value: 'KIGAMBONI' },
-    { label: 'Kimbiji', value: 'KIMBIJI' },
-    { label: 'Pemba Mnazi', value: 'PEMBA_MNAZI' },
-    { label: 'Somangila', value: 'SOMANGILA' },
-    { label: 'Vijibweni', value: 'VIJIBWENI' },
-  ],
-  
-  // Arusha - Arusha City
-  ARUSHA_CITY: [
-    { label: 'Baraa', value: 'BARAA' },
-    { label: 'Daraja Mbili', value: 'DARAJA_MBILI' },
-    { label: 'Elerai', value: 'ELERAI' },
-    { label: 'Kaloleni', value: 'KALOLENI' },
-    { label: 'Kati', value: 'KATI' },
-    { label: 'Kimandolu', value: 'KIMANDOLU' },
-    { label: 'Lemara', value: 'LEMARA' },
-    { label: 'Levolosi', value: 'LEVOLOSI' },
-    { label: 'Ngarenaro', value: 'NGARENARO' },
-    { label: 'Olorien', value: 'OLORIEN' },
-    { label: 'Sakina', value: 'SAKINA' },
-    { label: 'Sombetini', value: 'SOMBETINI' },
-    { label: 'Terrat', value: 'TERRAT' },
-    { label: 'Themi', value: 'THEMI' },
-  ],
-  
-  // Mwanza - Mwanza City
-  MWANZA_CITY: [
-    { label: 'Buhongwa', value: 'BUHONGWA' },
-    { label: 'Butimba', value: 'BUTIMBA' },
-    { label: 'Igoma', value: 'IGOMA' },
-    { label: 'Isamilo', value: 'ISAMILO' },
-    { label: 'Mahina', value: 'MAHINA' },
-    { label: 'Mbugani', value: 'MBUGANI' },
-    { label: 'Mikuyuni', value: 'MIKUYUNI' },
-    { label: 'Mirongo', value: 'MIRONGO' },
-    { label: 'Mkolani', value: 'MKOLANI' },
-    { label: 'Nyakato', value: 'NYAKATO' },
-    { label: 'Nyamanoro', value: 'NYAMANORO' },
-    { label: 'Pasiansi', value: 'PASIASI' },
-    { label: 'Pamba', value: 'PAMBA' },
-  ],
-  
-  // Mbeya - Mbeya City
-  MBEYA_CITY: [
-    { label: 'Iganjo', value: 'IGANJO' },
-    { label: 'Igawilo', value: 'IGAWILO' },
-    { label: 'Iyela', value: 'IYELA' },
-    { label: 'Itezi', value: 'ITEZI' },
-    { label: 'Itagano', value: 'ITAGANO' },
-    { label: 'Mwansekwa', value: 'MWANSEKWA' },
-    { label: 'Mwasanga', value: 'MWASANGA' },
-    { label: 'Nonde', value: 'NONDE' },
-    { label: 'Ruanda', value: 'RUANDA' },
-    { label: 'Sinde', value: 'SINDE' },
-    { label: 'Tembela', value: 'TEMBELA' },
-  ],
-  
-  // Tanga - Tanga City
-  TANGA_CITY: [
-    { label: 'Central', value: 'CENTRAL' },
-    { label: 'Chongoleani', value: 'CHONGOLEANI' },
-    { label: 'Kigoda', value: 'KIGODA' },
-    { label: 'Kijima', value: 'KIJIMA' },
-    { label: 'Kiomoni', value: 'KIOMONI' },
-    { label: 'Mabawa', value: 'MABAWA' },
-    { label: 'Majengo', value: 'MAJENGO' },
-    { label: 'Makorora', value: 'MAKORORA' },
-    { label: 'Marungu', value: 'MARUNGU' },
-    { label: 'Maweni', value: 'MAWENI' },
-    { label: 'Msambweni', value: 'MSAMBWENI' },
-    { label: 'Mzingani', value: 'MZINGANI' },
-    { label: 'Nguvumali', value: 'NGUVUMALI' },
-    { label: 'Pongwe', value: 'PONGWE' },
-    { label: 'Ras Kazone', value: 'RAS_KAZONE' },
-    { label: 'Tanga', value: 'TANGA' },
-    { label: 'Tongoni', value: 'TONGONI' },
-  ],
-};
+interface BuyerProfile {
+  id: string;
+  first_name: string; last_name: string; middle_name?: string;
+  nida_number?: string; phone?: string; email: string;
+  region?: string; district?: string; ward?: string;
+  is_verified: boolean; account_status: string;
+}
 
-// House features for quick selection
-const HOUSE_FEATURES = [
-  { label: 'Vyumba 2', value: 'BEDROOMS_2' },
-  { label: 'Vyumba 3', value: 'BEDROOMS_3' },
-  { label: 'Vyumba 4+', value: 'BEDROOMS_4' },
-  { label: 'Sebule', value: 'LIVING_ROOM' },
-  { label: 'Jiko la Ndani', value: 'INDOOR_KITCHEN' },
-  { label: 'Bafu ya Ndani', value: 'INDOOR_BATHROOM' },
-  { label: 'Choo cha Ndani', value: 'INDOOR_TOILET' },
-  { label: 'Garage', value: 'GARAGE' },
-  { label: 'Bustani', value: 'GARDEN' },
-  { label: 'Ua', value: 'COMPOUND' },
-  { label: 'Majiko', value: 'WATER_HEATER' },
-  { label: 'Mabati', value: 'IRON_SHEET' },
-  { label: 'Tiles', value: 'TILES' },
-  { label: 'Sakafu ya Saruji', value: 'CEMENT_FLOOR' },
-  { label: 'Fencing', value: 'FENCING' },
-  { label: 'Security', value: 'SECURITY' },
-  { label: 'CCTV', value: 'CCTV' },
-  { label: 'Askari', value: 'GUARD' },
-];
+interface WitnessInfo { name: string; phone: string; nida: string; }
+interface UploadedDoc { file: File; preview: string; label: string; }
 
-// Vehicle features for quick selection
-const VEHICLE_FEATURES = [
-  { label: 'Toyota', value: 'TOYOTA' },
-  { label: 'Nissan', value: 'NISSAN' },
-  { label: 'Mitsubishi', value: 'MITSUBISHI' },
-  { label: 'Suzuki', value: 'SUZUKI' },
-  { label: 'Isuzu', value: 'ISUZU' },
-  { label: 'Mazda', value: 'MAZDA' },
-  { label: 'Honda', value: 'HONDA' },
-  { label: 'Daihatsu', value: 'DAIHATSU' },
-  { label: 'Petrol', value: 'PETROL' },
-  { label: 'Diesel', value: 'DIESEL' },
-  { label: 'Automatic', value: 'AUTOMATIC' },
-  { label: 'Manual', value: 'MANUAL' },
-  { label: 'AC', value: 'AC' },
-  { label: 'Power Windows', value: 'POWER_WINDOWS' },
-  { label: 'Central Lock', value: 'CENTRAL_LOCK' },
-  { label: 'Radio', value: 'RADIO' },
-  { label: 'Bluetooth', value: 'BLUETOOTH' },
-  { label: 'GPS', value: 'GPS' },
-  { label: 'Reverse Camera', value: 'REVERSE_CAMERA' },
-  { label: 'ABS', value: 'ABS' },
-  { label: 'Airbags', value: 'AIRBAGS' },
-];
-
-// Land features for quick selection
-const LAND_FEATURES = [
-  { label: 'Eneo la Biashara', value: 'COMMERCIAL' },
-  { label: 'Eneo la Makazi', value: 'RESIDENTIAL' },
-  { label: 'Eneo la Kilimo', value: 'AGRICULTURAL' },
-  { label: 'Karibu na Barabara', value: 'NEAR_ROAD' },
-  { label: 'Umeme', value: 'ELECTRICITY' },
-  { label: 'Maji', value: 'WATER' },
-  { label: 'Fencing', value: 'FENCING' },
-  { label: 'Title Deed', value: 'TITLE_DEED' },
-  { label: 'Surveyed', value: 'SURVEYED' },
-  { label: 'Beach Front', value: 'BEACH_FRONT' },
-  { label: 'Mlimani', value: 'HILLSIDE' },
-  { label: 'Bonde', value: 'VALLEY' },
-];
-
-// Business features for quick selection
-const BUSINESS_FEATURES = [
-  { label: 'Duka', value: 'SHOP' },
-  { label: 'Mgahawa', value: 'RESTAURANT' },
-  { label: 'Hoteli', value: 'HOTEL' },
-  { label: 'Ofisi', value: 'OFFICE' },
-  { label: 'Warsha', value: 'WORKSHOP' },
-  { label: 'Kiwanda', value: 'FACTORY' },
-  { label: 'Ghorofa', value: 'MULTI_STOREY' },
-  { label: 'Umeme', value: 'ELECTRICITY' },
-  { label: 'Maji', value: 'WATER' },
-  { label: 'Parking', value: 'PARKING' },
-  { label: 'Security', value: 'SECURITY' },
-  { label: 'Customer Parking', value: 'CUSTOMER_PARKING' },
-];
-
-interface FormData {
+interface FormValues {
+  // Step 2 — Buyer lookup
+  buyer_search_term: string;
+  buyer_search_type: string; // NIDA | PHONE | CT_ID
+  // Step 3 — Asset
   asset_type: string;
   asset_description: string;
   asset_location: string;
-  region: string;
-  district: string;
-  ward: string;
-  street: string;
+  asset_identifier: string; // plot no, reg plate, etc.
+  sale_price: string;
   currency: string;
-  sale_price: number;
   payment_terms: string;
-  effective_date: string;
-  expiry_date: string;
-  seller_tin: string;
-  seller_additional_contact: string;
+  installment_details: string;
+  transfer_date: string;
+  // Step 4 — Terms & Witnesses
   special_conditions: string;
-  witness_name: string;
-  witness_phone: string;
-  witness_address: string;
+  witness1_name: string; witness1_phone: string; witness1_nida: string;
+  witness2_name: string; witness2_phone: string; witness2_nida: string;
+  // Consent
+  seller_confirmed: boolean;
   terms_accepted: boolean;
-  selected_features: string[];
 }
-
-interface LookupResult {
-  id: string;
-  citizen_id: string;
-  full_name: string;
-  phone?: string;
-  email?: string;
-  region?: string;
-  district?: string;
-}
-
-type Step = 'asset' | 'seller' | 'buyer' | 'terms' | 'review';
 
 export const MakubalianoMauzianoForm: React.FC<FormProps> = ({
-  onSubmit,
-  isLoading,
-  lang = 'sw',
-  userProfile
+  onSubmit, isLoading, lang = 'sw', userProfile,
 }) => {
   const t = labels[lang];
-  const [currentStep, setCurrentStep] = useState<Step>('asset');
-  const [showReview, setShowReview] = useState(false);
-  
-  // Citizen lookup state
-  const [citizenId, setCitizenId] = useState('');
-  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [lookupError, setLookupError] = useState('');
-  
-  // File upload state
-  const [agreementFile, setAgreementFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadedUrl, setUploadedUrl] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const progressFillRef = useRef<HTMLDivElement>(null);
-  
-  // Location state
-  const [selectedRegion, setSelectedRegion] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [selectedWard, setSelectedWard] = useState('');
-  
-  // Asset features state
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
-  const [customDescription, setCustomDescription] = useState('');
-  
-  const { register, handleSubmit, formState: { errors }, trigger, getValues, watch, setValue } = useForm<FormData>();
+  const L = (sw: string, en: string) => lang === 'sw' ? sw : en;
 
-  const steps: { key: Step; label: string; swLabel: string }[] = [
-    { key: 'asset', label: 'Asset Details', swLabel: 'Taarifa za Mali' },
-    { key: 'seller', label: 'Seller Info', swLabel: 'Muuzaji' },
-    { key: 'buyer', label: 'Buyer Lookup', swLabel: 'Tafuta Mnunuji' },
-    { key: 'terms', label: 'Terms', swLabel: 'Masharti' },
-    { key: 'review', label: 'Review', swLabel: 'Hakiki' },
+  const [step, setStep]               = useState<Step>('seller');
+  const [submitted, setSubmitted]     = useState(false);
+  const [appRef, setAppRef]           = useState('');
+  const [submitting, setSubmitting]   = useState(false);
+  const [errors, setErrors]           = useState<Record<string, string>>({});
+  const [docs, setDocs]               = useState<UploadedDoc[]>([]);
+  const docRef                        = useRef<HTMLInputElement>(null);
+  const [docErr, setDocErr]           = useState('');
+
+  // Buyer lookup state
+  const [buyerFound, setBuyerFound]       = useState<BuyerProfile | null>(null);
+  const [buyerSearching, setBuyerSearching] = useState(false);
+  const [buyerError, setBuyerError]       = useState('');
+
+  const [vals, setVals] = useState<FormValues>({
+    buyer_search_term: '', buyer_search_type: 'NIDA',
+    asset_type: '', asset_description: '', asset_location: '',
+    asset_identifier: '', sale_price: '', currency: 'TZS',
+    payment_terms: '', installment_details: '', transfer_date: '',
+    special_conditions: '',
+    witness1_name: '', witness1_phone: '', witness1_nida: '',
+    witness2_name: '', witness2_phone: '', witness2_nida: '',
+    seller_confirmed: false, terms_accepted: false,
+  });
+
+  const saleValue = parseFloat(vals.sale_price) || 0;
+  const fee       = calcFee(saleValue);
+  const fmtTsh   = (n: number) => `TSh ${n.toLocaleString()}`;
+
+  const STEPS: { key: Step; label: string; sw: string }[] = [
+    { key: 'seller',  label: 'Seller',  sw: 'Muuzaji' },
+    { key: 'buyer',   label: 'Buyer',   sw: 'Mnunuzi' },
+    { key: 'asset',   label: 'Asset',   sw: 'Mali' },
+    { key: 'terms',   label: 'Terms',   sw: 'Masharti' },
+    { key: 'preview', label: 'Preview', sw: 'Hakiki' },
   ];
+  const stepIdx  = STEPS.findIndex(s => s.key === step);
+  const progress = ((stepIdx + 1) / STEPS.length) * 100;
 
-  const currentStepIndex = steps.findIndex(s => s.key === currentStep);
-  const progress = ((currentStepIndex + 1) / steps.length) * 100;
+  const set    = (k: keyof FormValues, v: string | boolean) => setVals(p => ({ ...p, [k]: v }));
+  const clrErr = (k: string) => setErrors(p => { const n = { ...p }; delete n[k]; return n; });
+  const err    = (k: string) => errors[k];
 
-  // Watch sale price for fee calculation
-  const salePrice = watch('sale_price') || 0;
-  const currency = watch('currency');
-  const assetType = watch('asset_type');
-
-  // Calculate fee based on transaction value
-  const feeBreakdown = useMemo(() => {
-    if (salePrice <= 0) return null;
-    
-    const calculated = Math.round(salePrice * FEE_PERCENTAGE);
-    const finalFee = Math.max(MIN_FEE, Math.min(MAX_FEE, calculated));
-    
-    return {
-      calculated,
-      finalFee,
-      minFee: MIN_FEE,
-      maxFee: MAX_FEE,
-      percentage: FEE_PERCENTAGE * 100
-    };
-  }, [salePrice]);
-
-  // Get available districts based on selected region
-  const availableDistricts = selectedRegion ? DISTRICTS_BY_REGION[selectedRegion] || [] : [];
-  
-  // Get available wards based on selected district
-  const availableWards = selectedDistrict ? WARDS_BY_DISTRICT[selectedDistrict] || [] : [];
-
-  // Get feature options based on asset type
-  const getFeatureOptions = () => {
-    switch (assetType) {
-      case 'HOUSE':
-        return HOUSE_FEATURES;
-      case 'VEHICLE':
-        return VEHICLE_FEATURES;
-      case 'LAND':
-        return LAND_FEATURES;
-      case 'BUSINESS':
-        return BUSINESS_FEATURES;
-      default:
-        return [];
-    }
-  };
-
-  // Toggle feature selection
-  const toggleFeature = (feature: string) => {
-    setSelectedFeatures(prev => {
-      if (prev.includes(feature)) {
-        return prev.filter(f => f !== feature);
-      } else {
-        return [...prev, feature];
-      }
-    });
-  };
-
-  // Generate asset description from selected features and custom description
-  const generateAssetDescription = () => {
-    const featureLabels = selectedFeatures.map(f => {
-      const feature = getFeatureOptions().find(opt => opt.value === f);
-      return feature ? feature.label : f;
-    });
-    
-    const featuresText = featureLabels.join(', ');
-    
-    if (featuresText && customDescription) {
-      return `${featuresText}. ${customDescription}`;
-    } else if (featuresText) {
-      return featuresText;
-    } else {
-      return customDescription;
-    }
-  };
-
-  // Update form value when features or custom description change
-  useEffect(() => {
-    const description = generateAssetDescription();
-    setValue('asset_description', description);
-  }, [selectedFeatures, customDescription, assetType]);
-
-  // Citizen lookup handler
-  const handleCitizenLookup = async () => {
-    if (!citizenId.trim()) {
-      setLookupError(lang === 'sw' ? 'Tafadhali ingiza Namba ya Raia' : 'Please enter Citizen ID');
-      return;
-    }
-
-    setSearching(true);
-    setLookupError('');
-    setLookupResult(null);
-
+  // ─── Buyer lookup ────────────────────────────────────────────────────────
+  const searchBuyer = async () => {
+    const term = vals.buyer_search_term.trim();
+    if (!term) { setBuyerError(L('Ingiza namba ya kutafuta', 'Enter a search term')); return; }
+    setBuyerSearching(true); setBuyerError(''); setBuyerFound(null);
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, citizen_id, first_name, middle_name, last_name, phone, email, region, district')
-        .eq('citizen_id', citizenId.trim().toUpperCase())
-        .single();
-
+      let query = supabase.from('profiles').select('*');
+      if (vals.buyer_search_type === 'NIDA')  query = query.eq('nida_number', term);
+      if (vals.buyer_search_type === 'PHONE') query = query.eq('phone', term);
+      if (vals.buyer_search_type === 'CT_ID') query = query.eq('citizen_id', term);
+      const { data, error } = await query.single();
       if (error || !data) {
-        setLookupError(lang === 'sw' 
-          ? 'Mtumiaji hajapatikana. Hakikisha namba ni sahihi.' 
-          : 'User not found. Please verify the ID.');
+        setBuyerError(L('Mtu huyu hayupo kwenye mfumo. Lazima awe mwananchi aliyesajiliwa na kuthibitishwa.',
+                        'Person not found. They must be a registered and verified citizen.'));
         return;
       }
-
-      // Prevent selecting self
-      if (userProfile && data.id === userProfile.id) {
-        setLookupError(lang === 'sw' 
-          ? 'Huwezi kuchagua wewe mwenyewe kama mhusika wa pili.' 
-          : 'You cannot select yourself as the second party.');
+      if (data.account_status !== 'active' || !data.is_verified) {
+        setBuyerError(L('Akaunti ya mtu huyu haijathibitishwa au imezuiwa. Hawezi kuwa mnunuzi.',
+                        'This person\'s account is not verified or has been suspended. They cannot be a buyer.'));
         return;
       }
-
-      setLookupResult({
-        id: data.id,
-        citizen_id: data.citizen_id,
-        full_name: `${data.first_name} ${data.middle_name || ''} ${data.last_name}`.trim(),
-        phone: data.phone,
-        email: data.email,
-        region: data.region,
-        district: data.district
-      });
+      if (data.id === userProfile?.id) {
+        setBuyerError(L('Huwezi kuwa muuzaji na mnunuzi wa bidhaa moja.',
+                        'You cannot be both seller and buyer of the same asset.'));
+        return;
+      }
+      setBuyerFound(data as BuyerProfile);
     } catch {
-      setLookupError(lang === 'sw' ? 'Hitilafu ya mtandao' : 'Network error');
+      setBuyerError(L('Hitilafu ya mtandao. Jaribu tena.', 'Network error. Please try again.'));
     } finally {
-      setSearching(false);
+      setBuyerSearching(false);
     }
   };
 
-  // File upload handler
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // ─── Doc helpers ─────────────────────────────────────────────────────────
+  const addDoc = useCallback((file: File): string | null => {
+    if (!ALLOWED_DOCS.includes(file.type)) return L('Aina ya faili haikushukuliwa', 'File type not allowed');
+    if (file.size > MAX_DOC_SIZE) return L('Faili ni kubwa sana. Upeo ni 10MB', 'File too large. Max 10MB');
+    setDocs(p => [...p, { file, preview: URL.createObjectURL(file), label: file.name }]);
+    return null;
+  }, [lang]);
+  const removeDoc = (i: number) => setDocs(p => { URL.revokeObjectURL(p[i].preview); return p.filter((_, idx) => idx !== i); });
 
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert(lang === 'sw' ? 'Faili kubwa sana. Upeo ni 10MB.' : 'File too large. Maximum is 10MB.');
-      return;
+  // ─── Validation ──────────────────────────────────────────────────────────
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    if (step === 'buyer') {
+      if (!buyerFound) e.buyer = L('Lazima utafute na uthibitishe mnunuzi kwanza', 'You must search and confirm the buyer first');
     }
+    if (step === 'asset') {
+      if (!vals.asset_type) e.asset_type = L('Chagua aina ya mali', 'Select asset type');
+      if (!vals.asset_description.trim()) e.asset_description = L('Maelezo ya mali yanahitajika', 'Asset description required');
+      if (!vals.sale_price.trim() || parseFloat(vals.sale_price) <= 0) e.sale_price = L('Bei ya mauzo inahitajika', 'Sale price required');
+      if (!vals.payment_terms) e.payment_terms = L('Chagua masharti ya malipo', 'Select payment terms');
+      if (!vals.transfer_date) e.transfer_date = L('Tarehe ya uhamisho inahitajika', 'Transfer date required');
+    }
+    if (step === 'terms') {
+      if (!vals.witness1_name.trim()) e.witness1_name = L('Jina la shahidi 1 linahitajika', 'Witness 1 name required');
+      if (!vals.witness1_phone.trim()) e.witness1_phone = L('Simu ya shahidi 1 inahitajika', 'Witness 1 phone required');
+      if (!vals.witness2_name.trim()) e.witness2_name = L('Jina la shahidi 2 linahitajika', 'Witness 2 name required');
+      if (!vals.witness2_phone.trim()) e.witness2_phone = L('Simu ya shahidi 2 inahitajika', 'Witness 2 phone required');
+    }
+    if (step === 'preview') {
+      if (!vals.seller_confirmed) e.seller_confirmed = L('Muuzaji lazima athibitishe', 'Seller must confirm');
+      if (!vals.terms_accepted) e.terms_accepted = L('Lazima ukubali masharti', 'Must accept terms');
+    }
+    setErrors(e); return Object.keys(e).length === 0;
+  };
 
-    setAgreementFile(file);
-    setUploading(true);
+  const goNext = () => { if (validate()) { const n = STEPS[stepIdx + 1]; if (n) setStep(n.key); } };
+  const goPrev = () => { const p = STEPS[stepIdx - 1]; if (p) setStep(p.key); };
 
+  const handleSubmit = async () => {
+    if (!validate()) return;
+    setSubmitting(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `agreements/${Date.now()}_${userProfile?.id || 'unknown'}.${fileExt}`;
-
-      const { error } = await supabase.storage
-        .from('documents')
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
-
-      setUploadedUrl(urlData.publicUrl);
-    } catch {
-      alert(lang === 'sw' ? 'Imeshindikana kupakia faili' : 'Failed to upload file');
-      setAgreementFile(null);
-    } finally {
-      setUploading(false);
-    }
+      const ref = `SA-${new Date().getFullYear()}-${Math.floor(Math.random() * 900000 + 100000)}`;
+      await onSubmit({
+        ...vals, buyer_id: buyerFound?.id, buyer_name: `${buyerFound?.first_name} ${buyerFound?.last_name}`,
+        buyer_nida: buyerFound?.nida_number, buyer_phone: buyerFound?.phone,
+        seller_id: userProfile?.id, total_fee: fee,
+        service_name: 'Makubaliano ya Mauzo', application_reference: ref,
+      }, docs.map(d => d.file));
+      setAppRef(ref); setSubmitted(true);
+    } catch { } finally { setSubmitting(false); }
   };
 
-  // Step validation
-  const validateCurrentStep = async (): Promise<boolean> => {
-    let fieldsToValidate: (keyof FormData)[] = [];
-    
-    switch (currentStep) {
-      case 'asset':
-        fieldsToValidate = ['asset_type', 'asset_description', 'sale_price', 'currency', 'effective_date', 'region', 'district', 'ward', 'street'];
-        break;
-      case 'seller':
-        return true; // Optional fields
-      case 'buyer':
-        return !!lookupResult;
-      case 'terms':
-        fieldsToValidate = ['terms_accepted'];
-        return !!uploadedUrl && await trigger(fieldsToValidate);
-    }
-    
-    return trigger(fieldsToValidate);
-  };
+  // ─── Shared UI ───────────────────────────────────────────────────────────
+  const inputCls = (name: string) =>
+    `w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white text-sm ${err(name) ? 'border-red-400 bg-red-50' : 'border-stone-200'}`;
+  const lbl    = 'block text-xs font-bold text-stone-600 uppercase tracking-wider mb-1.5';
+  const secHdr = 'bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 rounded-xl border-l-4 border-blue-500 mb-4';
 
-  const handleNext = async () => {
-    const isValid = await validateCurrentStep();
-    if (isValid) {
-      const nextIndex = currentStepIndex + 1;
-      if (nextIndex < steps.length) {
-        setCurrentStep(steps[nextIndex].key);
-      }
-      if (currentStep === 'terms') {
-        setShowReview(true);
-      }
-    }
-  };
+  const Field = ({ name, label, required, hint, children: ch }: {
+    name: string; label: string; required?: boolean; hint?: string; children: React.ReactNode;
+  }) => (
+    <div>
+      <label className={lbl}>{label}{required && <span className="text-red-500 ml-0.5">*</span>}</label>
+      {ch}
+      {err(name) && <p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11}/>{err(name)}</p>}
+      {hint && !err(name) && <p className="text-stone-400 text-xs mt-1">{hint}</p>}
+    </div>
+  );
+  const Sel = ({ name, value, onChange, options, placeholder }: {
+    name: string; value: string; onChange: (v: string) => void; options: {label:string;value:string}[]; placeholder?: string;
+  }) => (
+    <select value={value} onChange={e => { onChange(e.target.value); clrErr(name); }} className={inputCls(name)}>
+      <option value="">{placeholder || t.select}</option>
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+  const TI = ({ name, value, onChange, placeholder, type = 'text' }: {
+    name: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+  }) => (
+    <input type={type} value={value} onChange={e => { onChange(e.target.value); clrErr(name); }}
+      placeholder={placeholder} className={inputCls(name)} />
+  );
 
-  const handlePrevious = () => {
-    const prevIndex = currentStepIndex - 1;
-    if (prevIndex >= 0) {
-      setCurrentStep(steps[prevIndex].key);
-    }
-  };
-
-  const onFormSubmit = async (data: FormData) => {
-    if (!lookupResult || !feeBreakdown) return;
-
-    const submitData = {
-      ...data,
-      service_fee: feeBreakdown.finalFee,
-      buyer_id: lookupResult.id,
-      buyer_citizen_id: lookupResult.citizen_id,
-      buyer_name: lookupResult.full_name,
-      agreement_document_url: uploadedUrl,
-      seller_name: userProfile ? `${userProfile.first_name} ${userProfile.middle_name || ''} ${userProfile.last_name}`.trim() : '',
-      seller_citizen_id: userProfile?.citizen_id || '',
-      selected_features: selectedFeatures,
-    };
-
-    onSubmit(submitData);
-  };
-
-  const confirmSubmit = () => {
-    handleSubmit(onFormSubmit)();
-  };
-
-  // Styling classes
-  const inputClass = "w-full p-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all";
-  const labelClass = "block text-sm font-semibold text-stone-700 mb-1";
-  const sectionClass = "bg-linear-to-r from-emerald-100 to-teal-50 p-4 rounded-xl border border-emerald-200";
-
-  // Progress bar component
   const ProgressBar = () => (
     <div className="mb-6">
       <div className="flex justify-between mb-2">
-        {steps.map((step, index) => (
-          <div 
-            key={step.key}
-            className={`flex items-center gap-1 text-xs font-medium ${
-              index <= currentStepIndex ? 'text-emerald-600' : 'text-stone-400'
-            }`}
-          >
-            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-              index < currentStepIndex 
-                ? 'bg-emerald-600 text-white' 
-                : index === currentStepIndex 
-                  ? 'bg-emerald-500 text-white' 
-                  : 'bg-stone-200 text-stone-500'
-            }`}>
-              {index < currentStepIndex ? <CheckCircle className="h-4 w-4" /> : index + 1}
-            </span>
-            <span className="hidden md:inline">{lang === 'sw' ? step.swLabel : step.label}</span>
+        {STEPS.map((s, i) => (
+          <div key={s.key} className={`flex flex-col items-center ${i <= stepIdx ? 'text-blue-600' : 'text-stone-300'}`}>
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs border-2 transition-all
+              ${i < stepIdx ? 'bg-blue-600 border-blue-600 text-white' : i === stepIdx ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-stone-100 border-stone-200 text-stone-400'}`}>
+              {i < stepIdx ? <Check size={12}/> : i + 1}
+            </div>
+            <span className="text-[8px] sm:text-[9px] font-semibold mt-0.5 hidden sm:block">{lang === 'sw' ? s.sw : s.label}</span>
           </div>
         ))}
       </div>
-      <div className="bg-stone-200 h-2 rounded-full overflow-hidden">
-        <div
-          ref={progressFillRef}
-          className="progress-bar bg-linear-to-r from-emerald-500 to-teal-500 h-2 rounded-full transition-all duration-300"
-        />
+      <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
+        <ProgressFill progress={progress} className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-500"/>
+      </div>
+      <div className="flex justify-between mt-1.5">
+        <span className="text-xs text-stone-500 font-medium">{L(`Hatua ${stepIdx + 1} kati ya ${STEPS.length}`, `Step ${stepIdx + 1} of ${STEPS.length}`)}</span>
+        <span className="text-xs font-bold text-blue-600">{Math.round(progress)}%</span>
       </div>
     </div>
   );
 
-  // Review section component
-  const ReviewSection = () => {
-    const data = getValues();
-    
-    return (
-      <div className="space-y-6">
-        <div className={sectionClass}>
-          <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-            <Eye className="h-5 w-5" />
-            {lang === 'sw' ? 'HAKIKI MAKUBALIANO' : 'REVIEW AGREEMENT'}
-          </h3>
-        </div>
+  const PSection = ({ icon, title, stepKey, children: ch }: { icon: React.ReactNode; title: string; stepKey: Step; children: React.ReactNode }) => (
+    <div className="bg-white border border-stone-100 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-blue-50 px-4 py-2.5 border-b border-blue-100 flex items-center justify-between">
+        <div className="flex items-center gap-2"><span className="text-blue-600">{icon}</span><h4 className="font-bold text-blue-900 text-sm">{title}</h4></div>
+        <button type="button" onClick={() => setStep(stepKey)} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-bold hover:bg-blue-100 px-2 py-1 rounded-lg transition-colors">
+          <Edit2 size={11}/> {L('Hariri', 'Edit')}
+        </button>
+      </div>
+      <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2">{ch}</div>
+    </div>
+  );
+  const PRow = ({ label, value }: { label: string; value: string | undefined }) => (
+    <><p className="text-xs text-stone-500">{label}</p><p className="text-xs font-bold text-stone-800 text-right break-words">{value || '—'}</p></>
+  );
 
-        {/* Asset Summary */}
-        <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
-          <h4 className="font-bold text-stone-800 flex items-center gap-2">
-            <Home className="h-4 w-4" />
-            {lang === 'sw' ? 'Taarifa za Mali' : 'Asset Details'}
-          </h4>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <span className="text-stone-500">{lang === 'sw' ? 'Aina:' : 'Type:'}</span>
-              <p className="font-medium">{ASSET_TYPES.find(a => a.value === data.asset_type)?.label || data.asset_type}</p>
-            </div>
-            <div>
-              <span className="text-stone-500">{lang === 'sw' ? 'Bei:' : 'Price:'}</span>
-              <p className="font-medium">{Number(data.sale_price).toLocaleString()} {data.currency}</p>
-            </div>
-            <div className="col-span-2">
-              <span className="text-stone-500">{lang === 'sw' ? 'Maelezo:' : 'Description:'}</span>
-              <p className="font-medium">{data.asset_description}</p>
-            </div>
-            <div className="col-span-2">
-              <span className="text-stone-500">{lang === 'sw' ? 'Mahali:' : 'Location:'}</span>
-              <p className="font-medium">{data.street}, {data.ward}, {data.district}, {data.region}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Parties Summary */}
-        <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
-          <h4 className="font-bold text-stone-800 flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            {lang === 'sw' ? 'Pande za Makubaliano' : 'Agreement Parties'}
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-emerald-50 p-3 rounded-lg">
-              <span className="text-xs text-emerald-600 font-medium">{lang === 'sw' ? 'MUUZAJI / MPANGISHAJI' : 'SELLER / LANDLORD'}</span>
-              <p className="font-bold text-emerald-800">
-                {userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : '-'}
-              </p>
-              <p className="text-sm text-emerald-600">{userProfile?.citizen_id || ''}</p>
-            </div>
-            <div className="bg-emerald-50 p-3 rounded-lg">
-              <span className="text-xs text-emerald-600 font-medium">{lang === 'sw' ? 'MNUNUZI / MPANGAJI' : 'BUYER / TENANT'}</span>
-              <p className="font-bold text-emerald-800">{lookupResult?.full_name || '-'}</p>
-              <p className="text-sm text-emerald-600">{lookupResult?.citizen_id || ''}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Fee Summary */}
-        {feeBreakdown && (
-          <div className="bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
-            <h4 className="font-bold text-emerald-800 mb-3">{lang === 'sw' ? 'Muhtasari wa Ada' : 'Fee Summary'}</h4>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-emerald-700">{lang === 'sw' ? 'Thamani ya Mauziano:' : 'Transaction Value:'}</span>
-                <span className="font-medium">{Number(data.sale_price).toLocaleString()} {data.currency}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-emerald-700">{lang === 'sw' ? 'Ada (3%):' : 'Fee (3%):'}</span>
-                <span className="font-medium">{feeBreakdown.calculated.toLocaleString()} TZS</span>
-              </div>
-              {feeBreakdown.calculated !== feeBreakdown.finalFee && (
-                <>
-                  <div className="border-t border-emerald-200 my-2"></div>
-                  <div className="flex justify-between text-emerald-600">
-                    <span>{lang === 'sw' ? 'Kiwango cha Chini:' : 'Minimum Fee:'}</span>
-                    <span>{feeBreakdown.minFee.toLocaleString()} TZS</span>
-                  </div>
-                  <div className="flex justify-between text-emerald-600">
-                    <span>{lang === 'sw' ? 'Kiwango cha Juu:' : 'Maximum Fee:'}</span>
-                    <span>{feeBreakdown.maxFee.toLocaleString()} TZS</span>
-                  </div>
-                </>
-              )}
-              
-              <div className="border-t border-emerald-200 my-2"></div>
-              <div className="flex justify-between font-bold text-lg">
-                <span className="text-emerald-800">{lang === 'sw' ? 'Ada ya Mwisho:' : 'Final Fee:'}</span>
-                <span className="text-emerald-600">{feeBreakdown.finalFee.toLocaleString()} TZS</span>
-              </div>
-            </div>
-            
-            <p className="text-xs text-emerald-600 mt-3">
-              {lang === 'sw' 
-                ? 'Ada ni 3% ya thamani ya mauziano (kiwango cha chini 5,000 TZS, kiwango cha juu 500,000 TZS). Malipo yatakamilishwa baada ya kuwasilisha.'
-                : 'Fee is 3% of the transaction value (minimum 5,000 TZS, maximum 500,000 TZS). Payment will be completed after submission.'}
-            </p>
-          </div>
-        )}
-
-        {/* Important Notices */}
-        <div className="space-y-3">
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <Bell className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-bold text-blue-800 mb-1">
-                  {lang === 'sw' ? 'Arifa kwa Mhusika' : 'Notification to Second Party'}
-                </h4>
-                <p className="text-sm text-blue-700">
-                  {lang === 'sw' 
-                    ? 'Baada ya kuwasilisha, mnunuzi/mpangaji atapokea arifa ya kukagua na kuidhinisha makubaliano haya. Makubaliano hayatakamilika mpaka wakubali.'
-                    : 'After submission, the buyer/tenant will receive a notification to review and approve this agreement. The agreement will not be finalized until they accept.'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <Shield className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-bold text-emerald-800 mb-1">
-                  {lang === 'sw' ? 'Uhalali wa Makubaliano' : 'Agreement Validity'}
-                </h4>
-                <p className="text-sm text-emerald-700">
-                  {lang === 'sw' 
-                    ? 'Makubaliano haya yatakuwa na nguvu ya kisheria baada ya pande zote mbili kukubali. Hakikisha umesoma na kuelewa masharti yote.'
-                    : 'This agreement will be legally binding after both parties accept. Ensure you have read and understood all terms.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3 pt-4">
-          <button
-            type="button"
-            onClick={() => setShowReview(false)}
-            className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            {lang === 'sw' ? 'Rudi' : 'Back'}
-          </button>
-          <button
-            type="button"
-            onClick={confirmSubmit}
-            disabled={isLoading || !lookupResult || !uploadedUrl || !feeBreakdown}
-            className="flex-1 py-3 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <>
-                <FileCheck className="h-5 w-5" />
-                {lang === 'sw' ? 'Wasilisha Makubaliano' : 'Submit Agreement'}
-              </>
-            )}
-          </button>
+  // ─── Success screen ───────────────────────────────────────────────────────
+  if (submitted) return (
+    <div className="text-center space-y-6 py-4">
+      <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto"><CheckCircle2 size={40} className="text-blue-600"/></div>
+      <div className="space-y-2">
+        <h3 className="text-xl font-black text-stone-900">{L('Makubaliano Yamewasilishwa!', 'Agreement Submitted!')}</h3>
+        <p className="text-stone-500 text-sm">{L('Makubaliano ya Mauzo yamewasilishwa. Baada ya idhini ya Ofisi, pande zote mbili zitapokea nakala.', 'Sales Agreement submitted. After office approval, both parties will receive a copy.')}</p>
+      </div>
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-left space-y-3 max-w-sm mx-auto">
+        <p className="text-xs font-black text-blue-700 uppercase tracking-wider">{L('Namba ya Makubaliano', 'Agreement Reference')}</p>
+        <p className="text-2xl font-black text-blue-800 font-mono">{appRef}</p>
+        <div className="space-y-2 pt-2 border-t border-blue-200">
+          {[
+            [L('Muuzaji', 'Seller'), `${userProfile?.first_name} ${userProfile?.last_name}`],
+            [L('Mnunuzi', 'Buyer'), `${buyerFound?.first_name} ${buyerFound?.last_name}`],
+            [L('Mali', 'Asset'), ASSET_TYPES.find(a => a.value === vals.asset_type)?.label?.split('(')[0].trim()],
+            [L('Bei', 'Price'), saleValue > 0 ? `TSh ${saleValue.toLocaleString()}` : '—'],
+            [L('Ada', 'Fee'), fmtTsh(fee)],
+            [L('Hali', 'Status'), L('Inasubiri Idhini ya Ofisi', 'Pending Office Approval')],
+          ].map(([l, v]) => (
+            <div key={String(l)} className="flex justify-between text-sm"><span className="text-stone-500">{l}</span><span className="font-bold text-stone-800 text-right">{v}</span></div>
+          ))}
         </div>
       </div>
-    );
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-left max-w-sm mx-auto">
+        <p className="text-xs font-bold text-blue-700 mb-2">{L('Hatua Zinazofuata', 'What Happens Next')}</p>
+        <ul className="space-y-1.5">
+          {[
+            L('Ofisi itakagua makubaliano na kuthibitisha utambulisho wa pande zote mbili', 'Office will review agreement and verify both parties'),
+            L('Muuzaji NA Mnunuzi wataarifiwa kwa simu/barua pepe', 'Seller AND Buyer will be notified by phone/email'),
+            L(`Lipa ada ya ${fmtTsh(fee)} (3% ya thamani ya mauzo)`, `Pay fee of ${fmtTsh(fee)} (3% of sale value)`),
+            L('Pande zote mbili zitapata nakala rasmi ya makubaliano', 'Both parties will receive an official copy of the agreement'),
+          ].map((item, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-blue-700">
+              <span className="w-4 h-4 rounded-full bg-blue-200 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">{i + 1}</span>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+
+  const renderStep = () => {
+    switch (step) {
+
+      case 'seller': return (
+        <div className="space-y-5">
+          <div className={secHdr}>
+            <p className="font-bold text-blue-800 text-sm flex items-center gap-2"><User size={16}/> {L('TAARIFA ZA MUUZAJI', 'SELLER INFORMATION')}</p>
+            <p className="text-xs text-blue-600 mt-0.5">{L('Wewe ndiye muuzaji — taarifa zako zimechukuliwa kutoka kwenye wasifu wako', 'You are the seller — your details are taken from your profile')}</p>
+          </div>
+          {userProfile?.is_verified ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <UserCheck size={16} className="text-blue-600"/>
+                <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">{L('Muuzaji Aliyethibitishwa', 'Verified Seller')}</span>
+                <span className="ml-auto text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">✓ {L('IMETHIBITISHWA', 'VERIFIED')}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  [L('Jina Kamili', 'Full Name'), `${userProfile.first_name || ''} ${userProfile.middle_name || ''} ${userProfile.last_name || ''}`.trim()],
+                  ['NIDA', userProfile.nida_number || '—'],
+                  [L('Simu', 'Phone'), userProfile.phone || '—'],
+                  ['Email', userProfile.email || '—'],
+                  [L('Mkoa', 'Region'), userProfile.region || '—'],
+                  [L('Wilaya / Kata', 'District / Ward'), `${userProfile.district || ''} / ${userProfile.ward || ''}`.replace(/^ \/ $/, '—')],
+                ].map(([l, v]) => (
+                  <div key={String(l)} className="bg-white rounded-lg px-3 py-2">
+                    <p className="text-[9px] text-stone-400 uppercase tracking-wide">{l}</p>
+                    <p className="text-xs font-bold text-stone-800 truncate">{v}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3">
+              <UserX size={18} className="text-red-500 shrink-0 mt-0.5"/>
+              <div>
+                <p className="text-sm font-bold text-red-700">{L('Akaunti Yako Haijathibitishwa', 'Your Account is Not Verified')}</p>
+                <p className="text-xs text-red-600 mt-1">{L('Lazima akaunti yako ithibitishwe kabla ya kutumia huduma hii.', 'Your account must be verified before using this service.')}</p>
+              </div>
+            </div>
+          )}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex gap-2">
+            <Info size={14} className="text-blue-500 shrink-0 mt-0.5"/>
+            <p className="text-xs text-blue-700">{L('Makubaliano ya Mauzo yanafanywa kati ya pande mbili zilizosajiliwa kwenye mfumo. Muuzaji (wewe) na Mnunuzi wote lazima wawe wananchi waliothibitishwa.', 'A Sales Agreement is made between two parties registered in the system. Both Seller (you) and Buyer must be verified citizens.')}</p>
+          </div>
+        </div>
+      );
+
+      case 'buyer': return (
+        <div className="space-y-5">
+          <div className={secHdr}>
+            <p className="font-bold text-blue-800 text-sm flex items-center gap-2"><Search size={16}/> {L('TAFUTA MNUNUZI', 'FIND THE BUYER')}</p>
+            <p className="text-xs text-blue-600 mt-0.5">{L('Ingiza namba ya NIDA, simu, au CT ID ya mnunuzi kutafuta', 'Enter the buyer\'s NIDA, phone or CT ID to search')}</p>
+          </div>
+          <Field name="buyer_search_type" label={L('Tafuta Kwa', 'Search By')}>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'NIDA', label: 'NIDA' },
+                { value: 'PHONE', label: L('Simu', 'Phone') },
+                { value: 'CT_ID', label: 'CT ID' },
+              ].map(opt => (
+                <button key={opt.value} type="button" onClick={() => { set('buyer_search_type', opt.value); setBuyerFound(null); setBuyerError(''); }}
+                  className={`py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${vals.buyer_search_type === opt.value ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-stone-200 text-stone-500 hover:border-stone-300'}`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field name="buyer" label={L(`Namba ya ${vals.buyer_search_type === 'PHONE' ? 'Simu' : vals.buyer_search_type}`, `${vals.buyer_search_type === 'PHONE' ? 'Phone' : vals.buyer_search_type} Number`)} required>
+            <div className="flex gap-2">
+              <input value={vals.buyer_search_term}
+                onChange={e => { set('buyer_search_term', e.target.value); setBuyerFound(null); setBuyerError(''); clrErr('buyer'); }}
+                placeholder={vals.buyer_search_type === 'NIDA' ? 'XXXX-XXXX-XXXX-XXXX-XXXX' : vals.buyer_search_type === 'PHONE' ? '+255 7XX XXX XXX' : 'CT2026A00001'}
+                className={`flex-1 ${inputCls('buyer')}`}
+                onKeyDown={e => e.key === 'Enter' && searchBuyer()} />
+              <button type="button" onClick={searchBuyer} disabled={buyerSearching}
+                className="px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl font-bold text-sm flex items-center gap-2 transition-colors">
+                {buyerSearching ? <Loader2 size={15} className="animate-spin"/> : <Search size={15}/>}
+                <span className="hidden sm:inline">{L('Tafuta', 'Search')}</span>
+              </button>
+            </div>
+          </Field>
+          {buyerError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+              <UserX size={15} className="text-red-500 shrink-0 mt-0.5"/>
+              <p className="text-xs text-red-700 font-medium">{buyerError}</p>
+            </div>
+          )}
+          {buyerFound && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <UserCheck size={16} className="text-emerald-600"/>
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">{L('Mnunuzi Amepatikana na Kuthibitishwa', 'Buyer Found & Verified')}</span>
+                <span className="ml-auto text-[10px] font-black text-emerald-700 bg-emerald-200 px-2 py-0.5 rounded-full">✓ {L('AKTIV', 'ACTIVE')}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  [L('Jina Kamili', 'Full Name'), `${buyerFound.first_name} ${buyerFound.middle_name || ''} ${buyerFound.last_name}`.trim()],
+                  ['NIDA', buyerFound.nida_number || '—'],
+                  [L('Simu', 'Phone'), buyerFound.phone || '—'],
+                  [L('Mkoa', 'Region'), buyerFound.region || '—'],
+                  [L('Wilaya', 'District'), buyerFound.district || '—'],
+                  [L('Kata', 'Ward'), buyerFound.ward || '—'],
+                ].map(([l, v]) => (
+                  <div key={String(l)} className="bg-white rounded-lg px-3 py-2">
+                    <p className="text-[9px] text-stone-400 uppercase tracking-wide">{l}</p>
+                    <p className="text-xs font-bold text-stone-800 truncate">{v}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-emerald-600 mt-3 font-medium">
+                {L('✓ Hii ndiyo taarifa za mnunuzi. Hakikisha ni sahihi kabla ya kuendelea.', '✓ These are the buyer\'s details. Confirm they are correct before proceeding.')}
+              </p>
+            </div>
+          )}
+        </div>
+      );
+
+      case 'asset': return (
+        <div className="space-y-5">
+          <div className={secHdr}>
+            <p className="font-bold text-blue-800 text-sm flex items-center gap-2"><Home size={16}/> {L('TAARIFA ZA MALI INAYOUZWA', 'ASSET BEING SOLD')}</p>
+          </div>
+          <Field name="asset_type" label={L('Aina ya Mali', 'Type of Asset')} required>
+            <Sel name="asset_type" value={vals.asset_type} onChange={v => { set('asset_type', v); clrErr('asset_type'); }} options={ASSET_TYPES}/>
+          </Field>
+          <Field name="asset_description" label={L('Maelezo ya Kina ya Mali', 'Detailed Asset Description')} required
+            hint={L('Eleza mali kwa undani: hali, vipimo, sifa, n.k.', 'Describe the asset in detail: condition, size, features, etc.')}>
+            <textarea value={vals.asset_description} onChange={e => { set('asset_description', e.target.value); clrErr('asset_description'); }}
+              rows={4} placeholder={L('Maelezo ya mali inayouzwa...', 'Description of the asset being sold...')}
+              className={`${inputCls('asset_description')} resize-none`}/>
+          </Field>
+          <Field name="asset_location" label={L('Mahali pa Mali (Kama Ni Ardhi/Nyumba)', 'Asset Location (If Land/Property)')}
+            hint={L('Anwani kamili: Kata, Mtaa, Namba ya Nyumba', 'Full address: Ward, Street, House Number')}>
+            <TI name="asset_location" value={vals.asset_location} onChange={v => set('asset_location', v)}
+              placeholder={L('Mfano: Sinza B, Dodoma Road, No. 45', 'E.g. Sinza B, Dodoma Road, No. 45')}/>
+          </Field>
+          <Field name="asset_identifier" label={L('Namba ya Utambulisho wa Mali (Hiari)', 'Asset Identifier (Optional)')}
+            hint={L('Mfano: Namba ya Plot, Namba ya Usajili wa Gari, n.k.', 'E.g. Plot number, vehicle registration, etc.')}>
+            <TI name="asset_identifier" value={vals.asset_identifier} onChange={v => set('asset_identifier', v)}
+              placeholder={L('Namba ya plot, usajili, n.k.', 'Plot no., registration no., etc.')}/>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field name="sale_price" label={L('Bei ya Mauzo (TSh)', 'Sale Price (TSh)')} required>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 text-xs font-bold pointer-events-none">TSh</span>
+                <input type="number" value={vals.sale_price} onChange={e => { set('sale_price', e.target.value); clrErr('sale_price'); }}
+                  placeholder="1,000,000" className={`${inputCls('sale_price')} pl-12`}/>
+              </div>
+            </Field>
+            <Field name="transfer_date" label={L('Tarehe ya Uhamisho', 'Transfer Date')} required>
+              <TI name="transfer_date" value={vals.transfer_date} type="date" onChange={v => { set('transfer_date', v); clrErr('transfer_date'); }}/>
+            </Field>
+          </div>
+          {saleValue > 0 && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex justify-between items-center">
+              <span className="text-xs text-stone-500">{L('Ada ya Huduma (3% ya thamani)', 'Service Fee (3% of value)')}</span>
+              <span className="font-black text-blue-700">{fmtTsh(fee)}</span>
+            </div>
+          )}
+          <Field name="payment_terms" label={L('Masharti ya Malipo', 'Payment Terms')} required>
+            <Sel name="payment_terms" value={vals.payment_terms} onChange={v => { set('payment_terms', v); clrErr('payment_terms'); }} options={PAYMENT_TERMS}/>
+          </Field>
+          {vals.payment_terms === 'INSTALLMENTS' && (
+            <Field name="installment_details" label={L('Maelezo ya Awamu za Malipo', 'Installment Payment Details')}
+              hint={L('Mfano: Awamu 3, kila mwezi TSh 200,000', 'E.g. 3 installments, TSh 200,000/month')}>
+              <textarea value={vals.installment_details} onChange={e => set('installment_details', e.target.value)}
+                rows={2} placeholder={L('Eleza awamu za malipo...', 'Describe installment schedule...')}
+                className={`${inputCls('installment_details')} resize-none`}/>
+            </Field>
+          )}
+          {/* Documents */}
+          <div>
+            <label className={lbl}>{L('Nyaraka za Mali (Hiari)', 'Asset Documents (Optional)')}</label>
+            <p className="text-xs text-stone-400 mb-2">{L('Mfano: Hati ya ardhi, hati ya gari, picha za mali', 'E.g. Title deed, vehicle logbook, asset photos')}</p>
+            <div onClick={() => docRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-4 cursor-pointer transition-all text-center ${docs.length > 0 ? 'border-blue-400 bg-blue-50' : 'border-stone-300 hover:border-blue-400 hover:bg-blue-50/40'}`}>
+              {docs.length > 0 ? (
+                <div className="space-y-2">
+                  {docs.map((doc, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-white rounded-lg p-2 shadow-sm">
+                      {doc.file.type.startsWith('image/') ? <img src={doc.preview} className="w-9 h-9 object-cover rounded-lg shrink-0" alt=""/> : <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center shrink-0"><FileText size={15} className="text-blue-600"/></div>}
+                      <div className="flex-1 min-w-0 text-left"><p className="text-xs font-bold text-stone-700 truncate">{doc.file.name}</p><p className="text-xs text-stone-400">{(doc.file.size/1024).toFixed(0)} KB</p></div>
+                      <button type="button" onClick={e => { e.stopPropagation(); removeDoc(i); }} className="p-1.5 text-red-400 hover:text-red-600 rounded-full"><X size={13}/></button>
+                    </div>
+                  ))}
+                  <p className="text-xs text-blue-600 font-medium">{L('Bonyeza kuongeza zaidi', 'Click to add more')}</p>
+                </div>
+              ) : (
+                <div className="py-3"><Upload size={22} className="mx-auto text-stone-400 mb-2"/><p className="text-sm font-semibold text-stone-600">{L('Bonyeza kupakia', 'Click to upload')}</p><p className="text-xs text-stone-400 mt-1">JPG, PNG, PDF · Max 10MB</p></div>
+              )}
+            </div>
+            <input ref={docRef} type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={e => { const files = Array.from(e.target.files||[]); let le=''; files.forEach(f => { const er = addDoc(f); if(er) le=er; }); if(le) setDocErr(le); else setDocErr(''); e.target.value=''; }} className="hidden"/>
+            {docErr && <p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11}/>{docErr}</p>}
+          </div>
+        </div>
+      );
+
+      case 'terms': return (
+        <div className="space-y-5">
+          <div className={secHdr}>
+            <p className="font-bold text-blue-800 text-sm flex items-center gap-2"><FileSignature size={16}/> {L('MASHARTI NA MASHAHIDI', 'TERMS & WITNESSES')}</p>
+          </div>
+          <Field name="special_conditions" label={L('Masharti Maalum ya Makubaliano (Hiari)', 'Special Agreement Conditions (Optional)')}
+            hint={L('Masharti yoyote ya ziada yanayokubaliana na pande zote mbili', 'Any additional terms agreed by both parties')}>
+            <textarea value={vals.special_conditions} onChange={e => set('special_conditions', e.target.value)}
+              rows={4} placeholder={L('Mfano: Mali itakabidhiwa baada ya malipo kamili. Muuzaji atahakikisha hati zote zisalimishwe ndani ya siku 30...', 'E.g. Asset will be handed over after full payment. Seller will ensure all documents are transferred within 30 days...')}
+              className={`${inputCls('special_conditions')} resize-none`}/>
+          </Field>
+          {/* Witnesses */}
+          {[{ num: 1, nameKey: 'witness1_name' as const, phoneKey: 'witness1_phone' as const, nidaKey: 'witness1_nida' as const },
+            { num: 2, nameKey: 'witness2_name' as const, phoneKey: 'witness2_phone' as const, nidaKey: 'witness2_nida' as const }
+          ].map(w => (
+            <div key={w.num} className="border border-stone-200 rounded-xl overflow-hidden">
+              <div className="bg-stone-50 px-4 py-2.5 border-b border-stone-100 flex items-center gap-2">
+                <Users size={13} className="text-stone-500"/>
+                <span className="text-xs font-bold text-stone-700 uppercase tracking-wide">{L(`SHAHIDI ${w.num}`, `WITNESS ${w.num}`)} *</span>
+              </div>
+              <div className="p-4 space-y-3">
+                <Field name={w.nameKey} label={L('Jina Kamili', 'Full Name')} required>
+                  <TI name={w.nameKey} value={vals[w.nameKey]} onChange={v => { set(w.nameKey, v); clrErr(w.nameKey); }} placeholder={L('Jina kamili la shahidi', "Witness's full name")}/>
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field name={w.phoneKey} label={L('Simu', 'Phone')} required>
+                    <TI name={w.phoneKey} value={vals[w.phoneKey]} onChange={v => { set(w.phoneKey, v); clrErr(w.phoneKey); }} placeholder="+255 7XX XXX XXX"/>
+                  </Field>
+                  <Field name={w.nidaKey} label={L('NIDA (Hiari)', 'NIDA (Optional)')}>
+                    <TI name={w.nidaKey} value={vals[w.nidaKey]} onChange={v => set(w.nidaKey, v)} placeholder="XXXX-XXXX..."/>
+                  </Field>
+                </div>
+              </div>
+            </div>
+          ))}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex gap-2">
+            <Shield size={14} className="text-blue-500 shrink-0 mt-0.5"/>
+            <p className="text-xs text-blue-700">{L('Mashahidi wawili wanahitajika kisheria. Wasijuane na muuzaji au mnunuzi kwa karibu sana (si jamaa wa karibu).', 'Two witnesses are legally required. They should not be closely related to either the seller or buyer.')}</p>
+          </div>
+        </div>
+      );
+
+      case 'preview': return (
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+            <Eye size={18} className="text-amber-600 shrink-0 mt-0.5"/>
+            <div>
+              <p className="font-bold text-amber-800 text-sm">{L('Hakiki Makubaliano Kabla ya Kuwasilisha', 'Review Agreement Before Submitting')}</p>
+              <p className="text-xs text-amber-700 mt-0.5">{L('Baada ya kuwasilisha, Ofisi itakagua na kutoa nakala kwa pande zote mbili.', 'After submission, the Office will review and issue copies to both parties.')}</p>
+            </div>
+          </div>
+          <PSection icon={<User size={14}/>} title={L('Muuzaji', 'Seller')} stepKey="seller">
+            <PRow label={L('Jina', 'Name')} value={`${userProfile?.first_name} ${userProfile?.last_name}`}/>
+            <PRow label="NIDA" value={userProfile?.nida_number}/>
+            <PRow label={L('Simu', 'Phone')} value={userProfile?.phone}/>
+            <PRow label={L('Mkoa', 'Region')} value={userProfile?.region}/>
+          </PSection>
+          <PSection icon={<UserCheck size={14}/>} title={L('Mnunuzi', 'Buyer')} stepKey="buyer">
+            <PRow label={L('Jina', 'Name')} value={`${buyerFound?.first_name} ${buyerFound?.last_name}`}/>
+            <PRow label="NIDA" value={buyerFound?.nida_number}/>
+            <PRow label={L('Simu', 'Phone')} value={buyerFound?.phone}/>
+            <PRow label={L('Mkoa', 'Region')} value={buyerFound?.region}/>
+          </PSection>
+          <PSection icon={<Home size={14}/>} title={L('Mali Inayouzwa', 'Asset Being Sold')} stepKey="asset">
+            <PRow label={L('Aina', 'Type')} value={ASSET_TYPES.find(a => a.value === vals.asset_type)?.label}/>
+            <PRow label={L('Bei', 'Price')} value={saleValue > 0 ? `TSh ${saleValue.toLocaleString()}` : '—'}/>
+            <PRow label={L('Tarehe ya Uhamisho', 'Transfer Date')} value={vals.transfer_date}/>
+            <PRow label={L('Masharti ya Malipo', 'Payment Terms')} value={PAYMENT_TERMS.find(p => p.value === vals.payment_terms)?.label}/>
+            {vals.asset_location && <PRow label={L('Mahali', 'Location')} value={vals.asset_location}/>}
+            {vals.asset_identifier && <PRow label={L('Namba ya Utambulisho', 'Identifier')} value={vals.asset_identifier}/>}
+          </PSection>
+          <PSection icon={<Users size={14}/>} title={L('Mashahidi', 'Witnesses')} stepKey="terms">
+            <PRow label={L('Shahidi 1', 'Witness 1')} value={`${vals.witness1_name} · ${vals.witness1_phone}`}/>
+            <PRow label={L('Shahidi 2', 'Witness 2')} value={`${vals.witness2_name} · ${vals.witness2_phone}`}/>
+            {vals.special_conditions && <><p className="col-span-2 text-xs text-stone-500">{L('Masharti Maalum', 'Special Terms')}</p><p className="col-span-2 text-xs font-bold text-stone-800">{vals.special_conditions}</p></>}
+          </PSection>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex justify-between items-center">
+            <div>
+              <span className="font-bold text-blue-800 text-sm">{L('Ada ya Huduma:', 'Service Fee:')}</span>
+              <p className="text-xs text-blue-600">{L('3% ya thamani ya mauzo', '3% of sale value')}</p>
+            </div>
+            <span className="text-xl font-black text-blue-700">{fmtTsh(fee)}</span>
+          </div>
+          <div className="space-y-3">
+            <p className="text-xs font-black text-stone-600 uppercase tracking-wider">{L('IDHINI NA UTHIBITISHO', 'CONSENT & CONFIRMATION')}</p>
+            {[
+              { key: 'seller_confirmed' as const, sw: 'Mimi (Muuzaji) nathibitisha kwamba mimi ndiye mmiliki halali wa mali hii na nina haki ya kuiuza.', en: 'I (Seller) confirm that I am the rightful owner of this asset and have the right to sell it.' },
+              { key: 'terms_accepted' as const, sw: 'Nathibitisha kwamba taarifa zote ni za kweli na ninakubaliana na masharti ya Serikali ya Mtaa kuhusiana na makubaliano haya.', en: 'I confirm all information is accurate and agree to Local Government terms regarding this agreement.' },
+            ].map(item => (
+              <label key={item.key} className={`flex items-start gap-3 cursor-pointer rounded-xl p-3 border transition-colors ${vals[item.key] ? 'bg-blue-50 border-blue-300' : 'bg-stone-50 border-stone-200 hover:bg-blue-50/50'}`}>
+                <input type="checkbox" checked={vals[item.key]} onChange={e => { set(item.key, e.target.checked); clrErr(item.key); }} className="w-4 h-4 mt-0.5 rounded shrink-0"/>
+                <span className="text-xs text-stone-700 font-medium leading-relaxed">{lang === 'sw' ? item.sw : item.en}</span>
+              </label>
+            ))}
+            {(errors.seller_confirmed || errors.terms_accepted) && <p className="text-red-500 text-xs flex items-center gap-1"><AlertCircle size={11}/>{errors.seller_confirmed || errors.terms_accepted}</p>}
+          </div>
+        </div>
+      );
+      default: return null;
+    }
   };
 
-  if (showReview) {
-    return (
-      <form className="space-y-6">
-        <ReviewSection />
-      </form>
-    );
-  }
-
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
-      <ProgressBar />
-
-      {/* Step 1: Asset Details */}
-      {currentStep === 'asset' && (
-        <div className="space-y-6">
-          <div className={sectionClass}>
-            <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-              <Home className="h-5 w-5" />
-              {lang === 'sw' ? 'TAARIFA ZA MALI' : 'ASSET DETAILS'}
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Aina ya Mali' : 'Asset Type'} <span className="text-red-500">*</span>
-              </label>
-              <select 
-                {...register('asset_type', { required: true })} 
-                className={inputClass}
-                onChange={(e) => {
-                  setValue('asset_type', e.target.value);
-                  setSelectedFeatures([]);
-                }}
-              >
-                <option value="">{t.selectOption}</option>
-                {ASSET_TYPES.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              {errors.asset_type && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Sarafu' : 'Currency'} <span className="text-red-500">*</span>
-              </label>
-              <select 
-                {...register('currency', { required: true })} 
-                className={inputClass}
-                defaultValue="TZS"
-              >
-                {CURRENCY_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              {errors.currency && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-          </div>
-
-          {/* Asset Features Quick Selection */}
-          {assetType && getFeatureOptions().length > 0 && (
-            <div className="space-y-3">
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Vipengele vya Mali (Bofya kuchagua)' : 'Asset Features (Click to select)'}
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {getFeatureOptions().map(feature => (
-                  <button
-                    key={feature.value}
-                    type="button"
-                    onClick={() => toggleFeature(feature.value)}
-                    className={`p-2 text-xs rounded-lg border transition-all flex items-center gap-1 ${
-                      selectedFeatures.includes(feature.value)
-                        ? 'bg-emerald-100 border-emerald-500 text-emerald-700'
-                        : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    <CheckSquare className={`h-3 w-3 ${
-                      selectedFeatures.includes(feature.value) ? 'text-emerald-600' : 'text-stone-400'
-                    }`} />
-                    {feature.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Maelezo ya Ziada (Hiari)' : 'Additional Description (Optional)'}
-            </label>
-            <textarea 
-              value={customDescription}
-              onChange={(e) => setCustomDescription(e.target.value)}
-              className={inputClass}
-              rows={3}
-              placeholder={lang === 'sw' 
-                ? 'Andika maelezo ya ziada hapa...' 
-                : 'Write additional description here...'}
-            />
-          </div>
-
-          {/* Hidden field for asset_description */}
-          <input 
-            type="hidden" 
-            {...register('asset_description', { required: true })} 
-          />
-
-          {/* Location Section */}
-          <div className="border-t border-stone-200 pt-4">
-            <h4 className="font-bold text-stone-800 mb-3 flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              {lang === 'sw' ? 'Mahali pa Mali' : 'Asset Location'}
-            </h4>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>
-                  {lang === 'sw' ? 'Mkoa' : 'Region'} <span className="text-red-500">*</span>
-                </label>
-                <select 
-                  {...register('region', { required: true })}
-                  className={inputClass}
-                  value={selectedRegion}
-                  onChange={(e) => {
-                    setSelectedRegion(e.target.value);
-                    setSelectedDistrict('');
-                    setSelectedWard('');
-                    setValue('region', e.target.value);
-                    setValue('district', '');
-                    setValue('ward', '');
-                  }}
-                >
-                  <option value="">{lang === 'sw' ? 'Chagua Mkoa' : 'Select Region'}</option>
-                  {TANZANIA_REGIONS.map(region => (
-                    <option key={region.value} value={region.value}>{region.label}</option>
-                  ))}
-                </select>
-                {errors.region && <span className="text-red-500 text-sm">{t.required}</span>}
-              </div>
-
-              <div>
-                <label className={labelClass}>
-                  {lang === 'sw' ? 'Wilaya' : 'District'} <span className="text-red-500">*</span>
-                </label>
-                <select 
-                  {...register('district', { required: true })}
-                  className={inputClass}
-                  value={selectedDistrict}
-                  onChange={(e) => {
-                    setSelectedDistrict(e.target.value);
-                    setSelectedWard('');
-                    setValue('district', e.target.value);
-                    setValue('ward', '');
-                  }}
-                  disabled={!selectedRegion}
-                >
-                  <option value="">{lang === 'sw' ? 'Chagua Wilaya' : 'Select District'}</option>
-                  {availableDistricts.map(district => (
-                    <option key={district.value} value={district.value}>{district.label}</option>
-                  ))}
-                </select>
-                {errors.district && <span className="text-red-500 text-sm">{t.required}</span>}
-              </div>
-
-              <div>
-                <label className={labelClass}>
-                  {lang === 'sw' ? 'Kata' : 'Ward'} <span className="text-red-500">*</span>
-                </label>
-                <select 
-                  {...register('ward', { required: true })}
-                  className={inputClass}
-                  value={selectedWard}
-                  onChange={(e) => {
-                    setSelectedWard(e.target.value);
-                    setValue('ward', e.target.value);
-                  }}
-                  disabled={!selectedDistrict}
-                >
-                  <option value="">{lang === 'sw' ? 'Chagua Kata' : 'Select Ward'}</option>
-                  {availableWards.map(ward => (
-                    <option key={ward.value} value={ward.value}>{ward.label}</option>
-                  ))}
-                </select>
-                {errors.ward && <span className="text-red-500 text-sm">{t.required}</span>}
-              </div>
-
-              <div>
-                <label className={labelClass}>
-                  {lang === 'sw' ? 'Mtaa / Kitongoji' : 'Street / Neighborhood'} <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-                  <input 
-                    type="text" 
-                    {...register('street', { required: true })} 
-                    className={`${inputClass} pl-10`}
-                    placeholder={lang === 'sw' ? 'Mtaa, namba ya nyumba, alama' : 'Street, house number, landmarks'}
-                  />
-                </div>
-                {errors.street && <span className="text-red-500 text-sm">{t.required}</span>}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Bei ya Mauziano / Kodi' : 'Sale Price / Rent'} <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-                <input 
-                  type="number" 
-                  {...register('sale_price', { 
-                    required: true, 
-                    min: 1,
-                    validate: value => value > 0 || 'Price must be greater than 0'
-                  })} 
-                  className={`${inputClass} pl-10`}
-                  placeholder="0"
-                />
-              </div>
-              {errors.sale_price && <span className="text-red-500 text-sm">{errors.sale_price.message || t.required}</span>}
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Masharti ya Malipo' : 'Payment Terms'}
-              </label>
-              <select 
-                {...register('payment_terms')} 
-                className={inputClass}
-              >
-                <option value="">{lang === 'sw' ? 'Chagua...' : 'Select...'}</option>
-                {PAYMENT_TERMS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Tarehe ya Kuanza' : 'Effective Date'} <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-                <input 
-                  type="date" 
-                  {...register('effective_date', { required: true })} 
-                  className={`${inputClass} pl-10`}
-                  min={new Date().toISOString().split('T')[0]}
-                />
-              </div>
-              {errors.effective_date && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Tarehe ya Kuisha (kama ipo)' : 'Expiry Date (if applicable)'}
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-                <input 
-                  type="date" 
-                  {...register('expiry_date', {
-                    validate: (value, formValues) => {
-                      if (!value) return true;
-                      return new Date(value) > new Date(formValues.effective_date) || 
-                        (lang === 'sw' ? 'Tarehe ya kuisha lazima iwe baada ya tarehe ya kuanza' : 'Expiry date must be after effective date');
-                    }
-                  })} 
-                  className={`${inputClass} pl-10`}
-                  min={watch('effective_date')}
-                />
-              </div>
-              {errors.expiry_date && <span className="text-red-500 text-sm">{errors.expiry_date.message}</span>}
-            </div>
-          </div>
-
-          {/* Live Fee Preview */}
-          {salePrice > 0 && feeBreakdown && (
-            <div className="bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-emerald-800 flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  {lang === 'sw' ? 'Ada ya Makadirio:' : 'Estimated Fee:'}
-                </span>
-                <span className="font-bold text-lg text-emerald-600">{feeBreakdown.finalFee.toLocaleString()} TZS</span>
-              </div>
-              <div className="text-xs text-emerald-600 flex items-center gap-1">
-                <Info className="h-3 w-3" />
-                <span>
-                  {lang === 'sw' 
-                    ? `3% ya ${salePrice.toLocaleString()} ${currency || 'TZS'} = ${feeBreakdown.calculated.toLocaleString()} TZS` 
-                    : `3% of ${salePrice.toLocaleString()} ${currency || 'TZS'} = ${feeBreakdown.calculated.toLocaleString()} TZS`}
-                </span>
-              </div>
-              {(feeBreakdown.calculated < MIN_FEE || feeBreakdown.calculated > MAX_FEE) && (
-                <div className="text-xs text-emerald-600 mt-1">
-                  {feeBreakdown.calculated < MIN_FEE && (
-                    <span>{lang === 'sw' ? `Ada ya chini ${MIN_FEE.toLocaleString()} TZS imetumika` : `Minimum fee of ${MIN_FEE.toLocaleString()} TZS applied`}</span>
-                  )}
-                  {feeBreakdown.calculated > MAX_FEE && (
-                    <span>{lang === 'sw' ? `Ada ya juu ${MAX_FEE.toLocaleString()} TZS imetumika` : `Maximum fee of ${MAX_FEE.toLocaleString()} TZS applied`}</span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Step 2: Seller/Landlord Information */}
-      {currentStep === 'seller' && (
-        <div className="space-y-6">
-          <div className={sectionClass}>
-            <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-              <User className="h-5 w-5" />
-              {lang === 'sw' ? 'TAARIFA ZA MUUZAJI / MPANGISHAJI' : 'SELLER / LANDLORD INFORMATION'}
-            </h3>
-          </div>
-
-          {/* Verified profile info display */}
-          {userProfile && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-              <h4 className="font-bold text-emerald-800 mb-3 flex items-center gap-2">
-                <CheckCircle className="h-4 w-4" />
-                {lang === 'sw' ? 'Taarifa Zako (Kutoka kwa Wasifu)' : 'Your Information (From Profile)'}
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <span className="text-xs text-stone-500">{lang === 'sw' ? 'Jina Kamili' : 'Full Name'}</span>
-                  <p className="font-medium">{userProfile.first_name} {userProfile.middle_name || ''} {userProfile.last_name}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-stone-500">{lang === 'sw' ? 'Namba ya NIDA' : 'NIDA Number'}</span>
-                  <p className="font-medium">{userProfile.nida_number || '-'}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-stone-500">{lang === 'sw' ? 'Simu' : 'Phone'}</span>
-                  <p className="font-medium">{userProfile.phone}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-stone-500">Email</span>
-                  <p className="font-medium">{userProfile.email}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-stone-500">{lang === 'sw' ? 'Anwani' : 'Address'}</span>
-                  <p className="font-medium">{userProfile.region || ''} {userProfile.district || ''} {userProfile.ward || ''}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Namba ya TIN (TRA) - Hiari' : 'TIN Number (TRA) - Optional'}
-            </label>
-            <div className="relative">
-              <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-              <input 
-                type="text" 
-                {...register('seller_tin')} 
-                className={`${inputClass} pl-10`}
-                placeholder="123-456-789"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Simu ya Ziada (Hiari)' : 'Additional Phone (Optional)'}
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-              <input 
-                type="tel" 
-                {...register('seller_additional_contact')} 
-                className={`${inputClass} pl-10`}
-                placeholder="+255 7XX XXX XXX"
-              />
-            </div>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <div className="flex items-start gap-2">
-              <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-              <p className="text-sm text-blue-700">
-                {lang === 'sw' 
-                  ? 'Taarifa zako za msingi zitatumika kutoka kwa wasifu wako. Unaweza kuongeza TIN na namba ya simu ya ziada kwa ajili ya mawasiliano.'
-                  : 'Your basic information will be taken from your profile. You can add TIN and additional phone number for contact.'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Buyer/Tenant Lookup */}
-      {currentStep === 'buyer' && (
-        <div className="space-y-6">
-          <div className={sectionClass}>
-            <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              {lang === 'sw' ? 'TAFUTA MNUNUZI / MPANGAJI' : 'FIND BUYER / TENANT'}
-            </h3>
-          </div>
-
-          {/* Info banner */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <Search className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm text-blue-700 font-medium">
-                  {lang === 'sw' 
-                    ? 'Ingiza Namba ya Raia (Citizen ID) ya mtu unayetaka kuingia naye makubaliano. Namba hii inapatikana kwenye wasifu wa mtumiaji.'
-                    : 'Enter the Citizen ID of the person you want to enter into agreement with. This number is found on the user\'s profile.'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-              <input
-                type="text"
-                value={citizenId}
-                onChange={(e) => setCitizenId(e.target.value.toUpperCase())}
-                placeholder="CT2026A12345"
-                className="w-full p-3 pl-10 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-mono uppercase tracking-wider"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleCitizenLookup}
-              disabled={searching}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-amber-400 text-white rounded-xl font-semibold flex items-center gap-2 transition-all"
-            >
-              {searching ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Search className="h-5 w-5" />
-              )}
-              <span className="hidden sm:inline">
-                {lang === 'sw' ? 'Tafuta' : 'Search'}
-              </span>
+    <div className="space-y-6">
+      {!submitted && <ProgressBar/>}
+      <div className="min-h-[280px]">{renderStep()}</div>
+      {!submitted && (
+        <div className="flex gap-3 pt-4 border-t border-stone-100">
+          {stepIdx > 0 && (
+            <button type="button" onClick={goPrev} className="flex-1 py-3.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm">
+              <ArrowLeft size={17}/> {L('Nyuma', 'Previous')}
             </button>
-          </div>
-
-          {/* User found result */}
-          {lookupResult && (
-            <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-xl">
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle className="h-6 w-6 text-emerald-600" />
-                <span className="font-bold text-emerald-700 text-lg">
-                  {lang === 'sw' ? 'Mtumiaji Amepatikana!' : 'User Found!'}
-                </span>
-              </div>
-              
-              <div className="bg-white rounded-lg p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-stone-400" />
-                  <span className="font-semibold text-stone-600 w-24">{lang === 'sw' ? 'Jina:' : 'Name:'}</span>
-                  <span className="font-bold text-stone-900">{lookupResult.full_name}</span>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-stone-400" />
-                  <span className="font-semibold text-stone-600 w-24">{lang === 'sw' ? 'Namba:' : 'ID:'}</span>
-                  <span className="font-mono text-emerald-700 bg-emerald-50 px-2 py-1 rounded">{lookupResult.citizen_id}</span>
-                </div>
-                
-                {lookupResult.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-stone-400" />
-                    <span className="font-semibold text-stone-600 w-24">{lang === 'sw' ? 'Simu:' : 'Phone:'}</span>
-                    <span className="text-stone-700">{lookupResult.phone}</span>
-                  </div>
-                )}
-                
-                {lookupResult.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-stone-400" />
-                    <span className="font-semibold text-stone-600 w-24">Email:</span>
-                    <span className="text-stone-700">{lookupResult.email}</span>
-                  </div>
-                )}
-                
-                {(lookupResult.region || lookupResult.district) && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-stone-400" />
-                    <span className="font-semibold text-stone-600 w-24">{lang === 'sw' ? 'Anwani:' : 'Address:'}</span>
-                    <span className="text-stone-700">{lookupResult.region || ''} {lookupResult.district || ''}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <p className="text-xs text-emerald-700 font-medium flex items-center gap-1">
-                  <Bell className="h-4 w-4" />
-                  {lang === 'sw' 
-                    ? 'Baada ya kutuma ombi, mtumiaji huyu atapokea arifa ya kuidhinisha makubaliano haya.'
-                    : 'After submission, this user will receive a notification to approve this agreement.'}
-                </p>
-              </div>
-            </div>
           )}
-
-          {/* Error message */}
-          {lookupError && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-sm text-red-700 font-medium">{lookupError}</span>
-                  <p className="text-xs text-red-500 mt-1">
-                    {lang === 'sw' 
-                      ? 'Hakikisha mtumiaji amesajiliwa kwenye E-Serikali Mtaa na umeingiza namba sahihi.'
-                      : 'Ensure the user is registered on E-Serikali Mtaa and you entered the correct number.'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Tip for finding ID */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-            <h4 className="font-bold text-emerald-800 mb-2 flex items-center gap-2">
-              <Info className="h-4 w-4" />
-              {lang === 'sw' ? 'Jinsi ya Kupata Namba ya Raia' : 'How to Find Citizen ID'}
-            </h4>
-            <p className="text-sm text-emerald-700">
-              {lang === 'sw' 
-                ? 'Namba ya Raia inapatikana kwenye wasifu wa mtumiaji. Mfano: CT2026A12345. Hakikisha unaandika kwa usahihi.'
-                : 'Citizen ID is found on the user\'s profile. Example: CT2026A12345. Make sure you type it correctly.'}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Step 4: Terms and Documents */}
-      {currentStep === 'terms' && (
-        <div className="space-y-6">
-          <div className={sectionClass}>
-            <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-              <FileSignature className="h-5 w-5" />
-              {lang === 'sw' ? 'MASHARTI NA NYARAKA' : 'TERMS AND DOCUMENTS'}
-            </h3>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Masharti Maalum / Maelezo ya Ziada' : 'Special Conditions / Additional Notes'}
-            </label>
-            <textarea 
-              {...register('special_conditions')} 
-              className={inputClass}
-              rows={4}
-              placeholder={lang === 'sw' 
-                ? 'Andika masharti yoyote maalum ya makubaliano haya (mfano: malipo ya awamu, masharti ya ukaguzi, n.k.)' 
-                : 'Write any special conditions for this agreement (e.g., installment payments, inspection conditions, etc.)'}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Jina la Shahidi (Hiari)' : 'Witness Name (Optional)'}
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-                <input 
-                  type="text" 
-                  {...register('witness_name')} 
-                  className={`${inputClass} pl-10`}
-                  placeholder={lang === 'sw' ? 'Jina kamili la shahidi' : 'Full name of witness'}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Simu ya Shahidi (Hiari)' : 'Witness Phone (Optional)'}
-              </label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-                <input 
-                  type="tel" 
-                  {...register('witness_phone')} 
-                  className={`${inputClass} pl-10`}
-                  placeholder="+255 7XX XXX XXX"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Anwani ya Shahidi (Hiari)' : 'Witness Address (Optional)'}
-            </label>
-            <input 
-              type="text" 
-              {...register('witness_address')} 
-              className={inputClass}
-              placeholder={lang === 'sw' ? 'Anwani kamili ya shahidi' : 'Full address of witness'}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Pakia Mkataba wa Makubaliano (Signed Agreement)' : 'Upload Signed Agreement'} <span className="text-red-500">*</span>
-            </label>
-            
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              className="hidden"
-              aria-label="Upload signed agreement document"
-            />
-            
-            {!agreementFile ? (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                aria-label="Upload agreement document"
-                className="w-full p-8 border-2 border-dashed border-stone-300 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all flex flex-col items-center gap-3"
-              >
-                {uploading ? (
-                  <Loader2 className="h-10 w-10 text-emerald-500 animate-spin" />
-                ) : (
-                  <>
-                    <Upload className="h-10 w-10 text-stone-400" />
-                    <div className="text-center">
-                      <span className="text-stone-600 font-medium block">
-                        {lang === 'sw' ? 'Bofya kupakia mkataba' : 'Click to upload agreement'}
-                      </span>
-                      <span className="text-xs text-stone-400 mt-1 block">
-                        PDF, DOC, DOCX, JPG, PNG (Max 10MB)
-                      </span>
-                    </div>
-                  </>
-                )}
-              </button>
-            ) : (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-8 w-8 text-emerald-600" />
-                  <div>
-                    <p className="font-medium text-emerald-800">{agreementFile.name}</p>
-                    <p className="text-xs text-emerald-600">{(agreementFile.size / 1024).toFixed(1)} KB</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Remove uploaded file"
-                  onClick={() => {
-                    setAgreementFile(null);
-                    setUploadedUrl('');
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = '';
-                    }
-                  }}
-                  className="p-2 hover:bg-red-100 rounded-full transition-all"
-                >
-                  <X className="h-5 w-5 text-red-500" />
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Upload status */}
-          {uploadedUrl && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-emerald-600" />
-                <span className="text-emerald-700 font-medium">
-                  {lang === 'sw' ? 'Mkataba umepakiwa kikamilifu!' : 'Agreement uploaded successfully!'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Terms Acceptance Checkbox */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input 
-                type="checkbox" 
-                {...register('terms_accepted', { required: true })} 
-                className="w-5 h-5 mt-0.5 text-emerald-600 rounded focus:ring-emerald-500"
-              />
-              <div>
-                <span className="font-medium text-emerald-800">
-                  {lang === 'sw' 
-                    ? 'Nakubali masharti na kanuni za makubaliano' 
-                    : 'I accept the terms and conditions of this agreement'}
-                </span>
-                <p className="text-xs text-emerald-600 mt-1">
-                  {lang === 'sw' 
-                    ? 'Kwa kukubali, unathibitisha kuwa taarifa ulizotoa ni sahihi na unaelewa kuwa makubaliano haya yatakuwa na nguvu ya kisheria baada ya pande zote mbili kukubali.'
-                    : 'By accepting, you confirm that the information provided is correct and you understand that this agreement will be legally binding after both parties accept.'}
-                </p>
-              </div>
-            </label>
-            {errors.terms_accepted && (
-              <span className="text-red-500 text-sm block mt-2">
-                {lang === 'sw' ? 'Lazima ukubali masharti ili kuendelea' : 'You must accept the terms to continue'}
-              </span>
-            )}
-          </div>
-
-          {/* Document requirements */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              {lang === 'sw' ? 'Mahitaji ya Mkataba' : 'Agreement Requirements'}
-            </h4>
-            <ul className="text-sm text-blue-700 space-y-2">
-              <li className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-                <span>{lang === 'sw' ? 'Mkataba uwe umesainiwa na pande zote mbili' : 'Agreement must be signed by both parties'}</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-                <span>{lang === 'sw' ? 'Mkataba uwe unaonesha wazi bei, masharti, na tarehe' : 'Agreement must clearly show price, terms, and dates'}</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-                <span>{lang === 'sw' ? 'Faili liwe wazi na lisomeke vizuri' : 'File must be clear and legible'}</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* Fee Summary in Terms Step */}
-          {feeBreakdown && (
-            <div className="bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
-              <h4 className="font-bold text-emerald-800 mb-2">{lang === 'sw' ? 'Ada ya Usindikaji' : 'Processing Fee'}</h4>
-              <div className="flex justify-between items-center">
-                <span className="text-emerald-700">{lang === 'sw' ? 'Jumla ya Ada:' : 'Total Fee:'}</span>
-                <span className="font-bold text-xl text-emerald-600">{feeBreakdown.finalFee.toLocaleString()} TZS</span>
-              </div>
-            </div>
+          {step !== 'preview' ? (
+            <button type="button" onClick={goNext} className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 text-sm">
+              {step === 'terms' ? <><Eye size={17}/> {L('Hakiki Makubaliano', 'Preview Agreement')}</> : <>{L('Endelea', 'Continue')} <ArrowRight size={17}/></>}
+            </button>
+          ) : (
+            <button type="button" onClick={handleSubmit} disabled={submitting || isLoading}
+              className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed">
+              {submitting || isLoading ? <><Loader2 size={17} className="animate-spin"/> {L('Inawasilisha...', 'Submitting...')}</> : <><FileCheck size={17}/> {L('Thibitisha na Wasilisha', 'Confirm & Submit')}</>}
+            </button>
           )}
         </div>
       )}
-
-      {/* Navigation Buttons */}
-      <div className="flex gap-3 pt-6 border-t border-stone-200">
-        {currentStepIndex > 0 && (
-          <button
-            type="button"
-            onClick={handlePrevious}
-            className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            {lang === 'sw' ? 'Nyuma' : 'Previous'}
-          </button>
-        )}
-        
-        {currentStep !== 'review' && (
-          <button
-            type="button"
-            onClick={handleNext}
-            className={`flex-1 py-3 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 ${
-              currentStepIndex === 0 ? 'w-full' : ''
-            }`}
-          >
-            {currentStep === 'terms' ? (
-              <>
-                {lang === 'sw' ? 'Hakiki Makubaliano' : 'Review Agreement'}
-                <Eye className="h-5 w-5" />
-              </>
-            ) : (
-              <>
-                {lang === 'sw' ? 'Endelea' : 'Continue'}
-                <ArrowRight className="h-5 w-5" />
-              </>
-            )}
-          </button>
-        )}
-      </div>
-
-      {/* Hidden submit for form completion */}
-      {currentStep === 'review' && (
-        <button type="submit" className="hidden" aria-label="Submit form" />
-      )}
-    </form>
+    </div>
   );
 };
 

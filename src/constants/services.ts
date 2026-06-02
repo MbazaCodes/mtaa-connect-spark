@@ -274,3 +274,41 @@ export const HARDCODED_SERVICES: Service[] = [
 ];
 
 export const INITIAL_SERVICES = HARDCODED_SERVICES;
+
+// Services 6 & 7 — registered separately, forms handle their own logic
+HARDCODED_SERVICES.push(
+  {
+    id: "6",
+    name: "Makubaliano ya Mauzo",
+    name_en: "Sales Agreement",
+    description: "Makubaliano rasmi ya mauzo ya mali kati ya muuzaji na mnunuzi waliohakikishwa.",
+    description_en: "Official sales agreement between verified seller and buyer registered in the system.",
+    fee: 0, // dynamic: 3% of sale value, min 5,000, max 500,000
+    active: true,
+    form_schema: [],
+    diaspora_form_schema: undefined,
+    document_template: {
+      document_type: "MAKUBALIANO YA MAUZO",
+      header: { country: "JAMHURI YA MUUNGANO WA TANZANIA", office: "OFISI YA RAIS - TAMISEMI", logo_url: "/tz-coat-of-arms.png" },
+      footer: "Makubaliano haya ni rasmi baada ya kuthibitishwa na Ofisi ya Serikali ya Mtaa. Nakala moja hutolewa kwa kila upande."
+    },
+    created_at: new Date().toISOString()
+  },
+  {
+    id: "7",
+    name: "Makubaliano ya Pango",
+    name_en: "Rental Agreement",
+    description: "Mkataba rasmi wa kukodi nyumba kati ya mpangishaji na mpangaji waliohakikishwa.",
+    description_en: "Official rental agreement between verified landlord and tenant registered in the system.",
+    fee: 10000, // min 10,000 or 1 month rent (whichever is greater)
+    active: true,
+    form_schema: [],
+    diaspora_form_schema: undefined,
+    document_template: {
+      document_type: "MAKUBALIANO YA PANGO",
+      header: { country: "JAMHURI YA MUUNGANO WA TANZANIA", office: "OFISI YA RAIS - TAMISEMI", logo_url: "/tz-coat-of-arms.png" },
+      footer: "Mkataba huu ni rasmi baada ya kuthibitishwa na Ofisi ya Serikali ya Mtaa. Nakala moja hutolewa kwa kila upande."
+    },
+    created_at: new Date().toISOString()
+  }
+);

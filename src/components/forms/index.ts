@@ -11,12 +11,16 @@ export { BaruaUtambulishoForm } from './BaruaUtambulishoForm';
 export { KibariMazishiForm } from './KibariMazishiForm';
 export { KibariShereheForm } from './KibariShereheForm';
 export { KibariUjeziMdogoForm } from './KibariUjeziMdogoForm';
+export { MakubalianoMauzianoForm } from './MakubalianoMauzianoForm';
+export { MakubalianoPangoForm } from './MakubalianoPangoForm';
 
 import { UtambulishoMkaziForm } from './UtambulishoMkaziForm';
 import { BaruaUtambulishoForm } from './BaruaUtambulishoForm';
 import { KibariMazishiForm } from './KibariMazishiForm';
 import { KibariShereheForm } from './KibariShereheForm';
 import { KibariUjeziMdogoForm } from './KibariUjeziMdogoForm';
+import { MakubalianoMauzianoForm } from './MakubalianoMauzianoForm';
+import { MakubalianoPangoForm } from './MakubalianoPangoForm';
 import React from 'react';
 import { FormProps } from './types';
 
@@ -26,6 +30,8 @@ export const SERVICE_FORMS: Record<string, React.FC<FormProps>> = {
   'Kibari cha Sherehe': KibariShereheForm,
   'Kibari cha Ujezi Mdogo': KibariUjeziMdogoForm,
   'Barua ya Utambulisho': BaruaUtambulishoForm,
+  'Makubaliano ya Mauzo': MakubalianoMauzianoForm,
+  'Makubaliano ya Pango': MakubalianoPangoForm,
 };
 
 export const getServiceForm = (serviceName: string): React.FC<FormProps> | null => {

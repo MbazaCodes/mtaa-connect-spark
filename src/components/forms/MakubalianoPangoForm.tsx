@@ -1,1650 +1,699 @@
 /**
- * Makubaliano ya Pango Form (PANGISHA)
- * Rent Agreement Form
- * 
- * Service: PANGISHA - Makubaliano ya Pango
- * Fee: 3% of total rent + VAT
+ * Makubaliano ya Pango — Rental Agreement Form
+ * Logic: Landlord (logged-in) pulls Tenant by NIDA/phone.
+ * Both must be registered & approved citizens.
+ * After admin approval, both receive a copy.
+ *
+ * Fee: TSh 10,000 flat (or 1 month rent if > 10,000)
+ * Color: Teal/cyan
  */
-import React, { useState, useMemo, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { 
-  Loader2, CheckCircle, ArrowLeft, ArrowRight, Eye, FileCheck, 
-  Home, User, Users, Search, MapPin, DollarSign, Calendar, 
-  Phone, Mail, Bell, Shield, Info, Calculator, Building, Key,
-  CheckSquare, Grid, Bed, Bath, Wifi, Zap, Droplet, Shield as ShieldIcon
+import React, { useState, useRef, useCallback } from 'react';
+import {
+  Loader2, CheckCircle, CheckCircle2, ArrowLeft, ArrowRight,
+  Eye, FileCheck, User, Users, AlertCircle, Shield, Info,
+  Upload, X, Edit2, FileText, Check, Search, Home, Key,
+  Calendar, Zap, Droplet, Wifi, UserCheck, UserX
 } from 'lucide-react';
 import { FormProps, labels } from './types';
 import { ProgressFill } from '../ui/ProgressFill';
 import { supabase } from '../../lib/supabase';
 
-// Fee constants
-const VAT_RATE = 0.18;
-const SERVICE_FEE_RATE = 0.03;
-
-// Property type options
+// ─── Constants ───────────────────────────────────────────────────────────────
 const PROPERTY_TYPES = [
-  { label: 'Nyumba ya Kuishi / Residential', value: 'LIVING' },
-  { label: 'Fremu ya Biashara / Commercial', value: 'BUSINESS' },
-  { label: 'Kiwanja / Shamba / Land', value: 'LAND' },
+  { label: 'Nyumba Nzima ya Kuishi (Full Residential House)', value: 'FULL_HOUSE' },
+  { label: 'Vyumba (Rooms / Bedsitter)', value: 'ROOMS' },
+  { label: 'Apartment / Ghorofa (Apartment / Flat)', value: 'APARTMENT' },
+  { label: 'Eneo la Biashara (Commercial Space / Shop)', value: 'COMMERCIAL' },
+  { label: 'Ghala / Stoo (Warehouse / Storage)', value: 'WAREHOUSE' },
+  { label: 'Shamba / Kiwanja (Farm / Plot)', value: 'LAND' },
+  { label: 'Nyingine (Other)', value: 'OTHER' },
 ];
 
-// Living space types
-const LIVING_SPACE_TYPES = [
-  { label: 'Nyumba Nzima / Full House', value: 'FULL_HOUSE' },
-  { label: 'Chumba / Vyumba / Rooms', value: 'ROOM' },
+const PAYMENT_FREQ = [
+  { label: 'Kila Mwezi (Monthly)', value: 'MONTHLY' },
+  { label: 'Kila Robo Mwaka (Quarterly)', value: 'QUARTERLY' },
+  { label: 'Kila Mwaka (Annually)', value: 'ANNUALLY' },
 ];
 
-// House types
-const HOUSE_TYPES = [
-  { label: 'Nyumba ya Kawaida (Bungalow)', value: 'BUNGALOW' },
-  { label: 'Ghorofa (Storey Building)', value: 'STOREY' },
-  { label: 'Apartment', value: 'APARTMENT' },
-  { label: 'Nyumba ya Kupanga (Tenement)', value: 'TENEMENT' },
-  { label: 'Nyinginezo (Other)', value: 'OTHER' },
+const LEASE_DURATION = [
+  { label: 'Miezi 6 (6 Months)', value: '6M' },
+  { label: 'Mwaka 1 (1 Year)', value: '1Y' },
+  { label: 'Miaka 2 (2 Years)', value: '2Y' },
+  { label: 'Miaka 3 (3 Years)', value: '3Y' },
+  { label: 'Wazi / Miezi kwa Miezi (Open-ended / Month-to-Month)', value: 'OPEN' },
 ];
 
-// Landlord role options
-const LANDLORD_ROLES = [
-  { label: 'Mwenye Nyumba (Owner)', value: 'OWNER' },
-  { label: 'Msimamizi (Manager)', value: 'MANAGER' },
+const NOTICE_PERIODS = [
+  { label: 'Siku 14 (14 Days)', value: '14D' },
+  { label: 'Siku 30 (30 Days)', value: '30D' },
+  { label: 'Siku 60 (60 Days)', value: '60D' },
 ];
 
-// Marital status options
-const MARITAL_STATUS = [
-  { label: 'Ameoa / Ameolewa', value: 'MARRIED' },
-  { label: 'Hajaoa / Hajaolewa', value: 'SINGLE' },
-  { label: 'Talaka', value: 'DIVORCED' },
-  { label: 'Mjane', value: 'WIDOWED' },
+const UTILITIES_OPTIONS = [
+  { key: 'water', label: 'Maji (Water)', icon: '💧' },
+  { key: 'electricity', label: 'Umeme (Electricity)', icon: '⚡' },
+  { key: 'wifi', label: 'Wifi / Internet', icon: '📶' },
+  { key: 'security', label: 'Usalama (Security)', icon: '🔒' },
+  { key: 'garbage', label: 'Taka (Garbage Collection)', icon: '🗑' },
 ];
 
-// Occupation options
-const OCCUPATION_TYPES = [
-  { label: 'Mwajiriwa / Employed', value: 'EMPLOYED' },
-  { label: 'Mwajiriwa Binafsi / Self-Employed', value: 'SELF_EMPLOYED' },
-  { label: 'Mwanafunzi / Student', value: 'STUDENT' },
-  { label: 'Mkulima / Farmer', value: 'FARMER' },
-  { label: 'Nyinginezo / Other', value: 'OTHER' },
-];
+const ALLOWED_DOCS = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const MAX_DOC_SIZE = 10 * 1024 * 1024;
 
-// Living arrangement options
-const LIVING_ARRANGEMENTS = [
-  { label: 'Peke Yangu / Alone', value: 'ALONE' },
-  { label: 'Na Familia / With Family', value: 'FAMILY' },
-];
+type Step = 'landlord' | 'tenant' | 'property' | 'terms' | 'preview';
 
-// Submitter role options
-const SUBMITTER_ROLES = [
-  { label: 'Mimi ni Mwenye Nyumba / Msimamizi (Landlord)', value: 'LANDLORD' },
-  { label: 'Mimi ni Mpangaji (Tenant)', value: 'TENANT' },
-];
-
-// Tanzania Regions
-const TANZANIA_REGIONS = [
-  { label: 'Arusha', value: 'ARUSHA' },
-  { label: 'Dar es Salaam', value: 'DAR_ES_SALAAM' },
-  { label: 'Dodoma', value: 'DODOMA' },
-  { label: 'Geita', value: 'GEITA' },
-  { label: 'Iringa', value: 'IRINGA' },
-  { label: 'Kagera', value: 'KAGERA' },
-  { label: 'Katavi', value: 'KATAVI' },
-  { label: 'Kigoma', value: 'KIGOMA' },
-  { label: 'Kilimanjaro', value: 'KILIMANJARO' },
-  { label: 'Lindi', value: 'LINDI' },
-  { label: 'Manyara', value: 'MANYARA' },
-  { label: 'Mara', value: 'MARA' },
-  { label: 'Mbeya', value: 'MBEYA' },
-  { label: 'Morogoro', value: 'MOROGORO' },
-  { label: 'Mtwara', value: 'MTWARA' },
-  { label: 'Mwanza', value: 'MWANZA' },
-  { label: 'Njombe', value: 'NJOMBE' },
-  { label: 'Pwani', value: 'PWANI' },
-  { label: 'Rukwa', value: 'RUKWA' },
-  { label: 'Ruvuma', value: 'RUVUMA' },
-  { label: 'Shinyanga', value: 'SHINYANGA' },
-  { label: 'Simiyu', value: 'SIMIYU' },
-  { label: 'Singida', value: 'SINGIDA' },
-  { label: 'Songwe', value: 'SONGWE' },
-  { label: 'Tabora', value: 'TABORA' },
-  { label: 'Tanga', value: 'TANGA' },
-];
-
-// Districts by Region
-const DISTRICTS_BY_REGION: Record<string, { label: string; value: string }[]> = {
-  ARUSHA: [
-    { label: 'Arusha City', value: 'ARUSHA_CITY' },
-    { label: 'Arusha Rural', value: 'ARUSHA_RURAL' },
-    { label: 'Karatu', value: 'KARATU' },
-    { label: 'Longido', value: 'LONGIDO' },
-    { label: 'Monduli', value: 'MONDULI' },
-    { label: 'Ngorongoro', value: 'NGORONGORO' },
-  ],
-  DAR_ES_SALAAM: [
-    { label: 'Ilala', value: 'ILALA' },
-    { label: 'Kinondoni', value: 'KINONDONI' },
-    { label: 'Ubungo', value: 'UBUNGO' },
-    { label: 'Kigamboni', value: 'KIGAMBONI' },
-    { label: 'Temeke', value: 'TEMEKE' },
-  ],
-  DODOMA: [
-    { label: 'Dodoma City', value: 'DODOMA_CITY' },
-    { label: 'Bahi', value: 'BAHI' },
-    { label: 'Chamwino', value: 'CHAMWINO' },
-    { label: 'Chemba', value: 'CHEMBA' },
-    { label: 'Kondoa', value: 'KONDOA' },
-    { label: 'Kongwa', value: 'KONGWA' },
-    { label: 'Mpwapwa', value: 'MPWAPWA' },
-  ],
-  GEITA: [
-    { label: 'Geita Town', value: 'GEITA_TOWN' },
-    { label: 'Bukombe', value: 'BUKOMBE' },
-    { label: 'Chato', value: 'CHATO' },
-    { label: 'Mbogwe', value: 'MBOGWE' },
-    { label: 'Nyang\'hwale', value: 'NYANG_HWALE' },
-  ],
-  IRINGA: [
-    { label: 'Iringa City', value: 'IRINGA_CITY' },
-    { label: 'Iringa Rural', value: 'IRINGA_RURAL' },
-    { label: 'Kilolo', value: 'KILOLO' },
-    { label: 'Mafinga', value: 'MAFINGA' },
-  ],
-  KAGERA: [
-    { label: 'Bukoba Urban', value: 'BUKOBA_URBAN' },
-    { label: 'Bukoba Rural', value: 'BUKOBA_RURAL' },
-    { label: 'Biharamulo', value: 'BIHARAMULO' },
-    { label: 'Karagwe', value: 'KARAGWE' },
-    { label: 'Kyerwa', value: 'KYERWA' },
-    { label: 'Missenyi', value: 'MISSENYI' },
-    { label: 'Muleba', value: 'MULEBA' },
-    { label: 'Ngara', value: 'NGARA' },
-  ],
-  KATAVI: [
-    { label: 'Mpanda Town', value: 'MPANDA_TOWN' },
-    { label: 'Mpanda Rural', value: 'MPANDA_RURAL' },
-    { label: 'Mlele', value: 'MLELE' },
-    { label: 'Tanganyika', value: 'TANGANYIKA' },
-  ],
-  KIGOMA: [
-    { label: 'Kigoma Urban', value: 'KIGOMA_URBAN' },
-    { label: 'Kigoma Rural', value: 'KIGOMA_RURAL' },
-    { label: 'Buhigwe', value: 'BUHIGWE' },
-    { label: 'Kakonko', value: 'KAKONKO' },
-    { label: 'Kasulu Town', value: 'KASULU_TOWN' },
-    { label: 'Kasulu Rural', value: 'KASULU_RURAL' },
-    { label: 'Kibondo', value: 'KIBONDO' },
-    { label: 'Uvinza', value: 'UVINZA' },
-  ],
-  KILIMANJARO: [
-    { label: 'Moshi Urban', value: 'MOSHI_URBAN' },
-    { label: 'Moshi Rural', value: 'MOSHI_RURAL' },
-    { label: 'Hai', value: 'HAI' },
-    { label: 'Mwanga', value: 'MWANGA' },
-    { label: 'Rombo', value: 'ROMBO' },
-    { label: 'Same', value: 'SAME' },
-    { label: 'Siha', value: 'SIHA' },
-  ],
-  LINDI: [
-    { label: 'Lindi Urban', value: 'LINDI_URBAN' },
-    { label: 'Lindi Rural', value: 'LINDI_RURAL' },
-    { label: 'Kilwa', value: 'KILWA' },
-    { label: 'Liwale', value: 'LIWALE' },
-    { label: 'Nachingwea', value: 'NACHINGWEA' },
-    { label: 'Ruangwa', value: 'RUANGWA' },
-  ],
-  MANYARA: [
-    { label: 'Babati Urban', value: 'BABATI_URBAN' },
-    { label: 'Babati Rural', value: 'BABATI_RURAL' },
-    { label: 'Hanang', value: 'HANANG' },
-    { label: 'Kiteto', value: 'KITETO' },
-    { label: 'Mbulu', value: 'MBULU' },
-    { label: 'Simanjiro', value: 'SIMANJIRO' },
-  ],
-  MARA: [
-    { label: 'Musoma Urban', value: 'MUSOMA_URBAN' },
-    { label: 'Musoma Rural', value: 'MUSOMA_RURAL' },
-    { label: 'Bunda', value: 'BUNDA' },
-    { label: 'Butiama', value: 'BUTIAMA' },
-    { label: 'Rorya', value: 'RORYA' },
-    { label: 'Serengeti', value: 'SERENGETI' },
-    { label: 'Tarime', value: 'TARIME' },
-  ],
-  MBEYA: [
-    { label: 'Mbeya City', value: 'MBEYA_CITY' },
-    { label: 'Mbeya Rural', value: 'MBEYA_RURAL' },
-    { label: 'Busokelo', value: 'BUSOKELO' },
-    { label: 'Chunya', value: 'CHUNYA' },
-    { label: 'Kyela', value: 'KYELA' },
-    { label: 'Mbarali', value: 'MBARALI' },
-    { label: 'Rungwe', value: 'RUNGWE' },
-  ],
-  MOROGORO: [
-    { label: 'Morogoro Urban', value: 'MOROGORO_URBAN' },
-    { label: 'Morogoro Rural', value: 'MOROGORO_RURAL' },
-    { label: 'Gairo', value: 'GAIRO' },
-    { label: 'Kilosa', value: 'KILOSA' },
-    { label: 'Malinyi', value: 'MALINYI' },
-    { label: 'Mlimba', value: 'MLIMBA' },
-    { label: 'Mvomero', value: 'MVOMERO' },
-    { label: 'Ulanga', value: 'ULANGA' },
-  ],
-  MTWARA: [
-    { label: 'Mtwara Urban', value: 'MTWARA_URBAN' },
-    { label: 'Mtwara Rural', value: 'MTWARA_RURAL' },
-    { label: 'Masasi Town', value: 'MASASI_TOWN' },
-    { label: 'Masasi Rural', value: 'MASASI_RURAL' },
-    { label: 'Nanyumbu', value: 'NANYUMBU' },
-    { label: 'Newala', value: 'NEWALA' },
-    { label: 'Tandahimba', value: 'TANDAHIMBA' },
-  ],
-  MWANZA: [
-    { label: 'Mwanza City', value: 'MWANZA_CITY' },
-    { label: 'Ilemela', value: 'ILEMELA' },
-    { label: 'Kwimba', value: 'KWIMBA' },
-    { label: 'Magu', value: 'MAGU' },
-    { label: 'Misungwi', value: 'MISUNGWI' },
-    { label: 'Nyamagana', value: 'NYAMAGANA' },
-    { label: 'Sengerema', value: 'SENGEREMA' },
-    { label: 'Ukerewe', value: 'UKEREWE' },
-  ],
-  NJOMBE: [
-    { label: 'Njombe Town', value: 'NJOMBE_TOWN' },
-    { label: 'Njombe Rural', value: 'NJOMBE_RURAL' },
-    { label: 'Ludewa', value: 'LUDEWA' },
-    { label: 'Makambako', value: 'MAKAMBAKO' },
-    { label: 'Makete', value: 'MAKETE' },
-    { label: 'Wanging\'ombe', value: 'WANGING_OMBE' },
-  ],
-  PWANI: [
-    { label: 'Kibaha Town', value: 'KIBAHA_TOWN' },
-    { label: 'Kibaha Rural', value: 'KIBAHA_RURAL' },
-    { label: 'Bagamoyo', value: 'BAGAMOYO' },
-    { label: 'Chalinze', value: 'CHALINZE' },
-    { label: 'Kibiti', value: 'KIBITI' },
-    { label: 'Kisarawe', value: 'KISARAWE' },
-    { label: 'Mafia', value: 'MAFIA' },
-    { label: 'Mkuranga', value: 'MKURANGA' },
-    { label: 'Rufiji', value: 'RUFIJI' },
-  ],
-  RUKWA: [
-    { label: 'Sumbawanga Urban', value: 'SUMBAWANGA_URBAN' },
-    { label: 'Sumbawanga Rural', value: 'SUMBAWANGA_RURAL' },
-    { label: 'Kalambo', value: 'KALAMBO' },
-    { label: 'Nkasi', value: 'NKASI' },
-  ],
-  RUVUMA: [
-    { label: 'Songea Urban', value: 'SONGEA_URBAN' },
-    { label: 'Songea Rural', value: 'SONGEA_RURAL' },
-    { label: 'Mbinga', value: 'MBINGA' },
-    { label: 'Namtumbo', value: 'NAMTUMBO' },
-    { label: 'Nyasa', value: 'NYASA' },
-    { label: 'Tunduru', value: 'TUNDURU' },
-  ],
-  SHINYANGA: [
-    { label: 'Shinyanga Urban', value: 'SHINYANGA_URBAN' },
-    { label: 'Shinyanga Rural', value: 'SHINYANGA_RURAL' },
-    { label: 'Kahama Town', value: 'KAHAMA_TOWN' },
-    { label: 'Kahama Rural', value: 'KAHAMA_RURAL' },
-    { label: 'Kishapu', value: 'KISHAPU' },
-    { label: 'Msalala', value: 'MSALALA' },
-    { label: 'Ushetu', value: 'USHETU' },
-  ],
-  SIMIYU: [
-    { label: 'Bariadi Town', value: 'BARIADI_TOWN' },
-    { label: 'Bariadi Rural', value: 'BARIADI_RURAL' },
-    { label: 'Busega', value: 'BUSEGA' },
-    { label: 'Itilima', value: 'ITILIMA' },
-    { label: 'Maswa', value: 'MASWA' },
-    { label: 'Meatu', value: 'MEATU' },
-  ],
-  SINGIDA: [
-    { label: 'Singida Urban', value: 'SINGIDA_URBAN' },
-    { label: 'Singida Rural', value: 'SINGIDA_RURAL' },
-    { label: 'Ikungi', value: 'IKUNGI' },
-    { label: 'Iramba', value: 'IRAMBA' },
-    { label: 'Manyoni', value: 'MANYONI' },
-    { label: 'Mkalama', value: 'MKALAMA' },
-  ],
-  SONGWE: [
-    { label: 'Vwawa', value: 'VWAWA' },
-    { label: 'Ileje', value: 'ILEJE' },
-    { label: 'Mbozi', value: 'MBOZI' },
-    { label: 'Momba', value: 'MOMBA' },
-    { label: 'Songwe', value: 'SONGWE' },
-    { label: 'Tunduma', value: 'TUNDUMA' },
-  ],
-  TABORA: [
-    { label: 'Tabora Urban', value: 'TABORA_URBAN' },
-    { label: 'Tabora Rural', value: 'TABORA_RURAL' },
-    { label: 'Igunga', value: 'IGUNGA' },
-    { label: 'Kaliua', value: 'KALIUA' },
-    { label: 'Nzega', value: 'NZEGA' },
-    { label: 'Sikonge', value: 'SIKONGE' },
-    { label: 'Urambo', value: 'URAMBO' },
-  ],
-  TANGA: [
-    { label: 'Tanga City', value: 'TANGA_CITY' },
-    { label: 'Handeni Town', value: 'HANDENI_TOWN' },
-    { label: 'Handeni Rural', value: 'HANDENI_RURAL' },
-    { label: 'Kilindi', value: 'KILINDI' },
-    { label: 'Korogwe Town', value: 'KOROGWE_TOWN' },
-    { label: 'Korogwe Rural', value: 'KOROGWE_RURAL' },
-    { label: 'Lushoto', value: 'LUSHOTO' },
-    { label: 'Mkinga', value: 'Mkinga' },
-    { label: 'Muheza', value: 'MUHEZA' },
-    { label: 'Pangani', value: 'PANGANI' },
-  ],
-};
-
-// Wards by District (simplified - add more as needed)
-const WARDS_BY_DISTRICT: Record<string, { label: string; value: string }[]> = {
-  // Dar es Salaam - Ilala
-  ILALA: [
-    { label: 'Buguruni', value: 'BUGURUNI' },
-    { label: 'Chanika', value: 'CHANIKA' },
-    { label: 'Gerezani', value: 'GEREZANI' },
-    { label: 'Ilala', value: 'ILALA' },
-    { label: 'Jangwani', value: 'JANGWANI' },
-    { label: 'Kariakoo', value: 'KARIAKOO' },
-    { label: 'Kipawa', value: 'KIPAWA' },
-    { label: 'Kitunda', value: 'KITUNDA' },
-    { label: 'Kisutu', value: 'KISUTU' },
-    { label: 'Mchafukoge', value: 'MCHAFUKOGE' },
-    { label: 'Mchikichini', value: 'MCHIKICHINI' },
-    { label: 'Msongola', value: 'MSONGOLA' },
-    { label: 'Pugu', value: 'PUGU' },
-    { label: 'Tabata', value: 'TABATA' },
-    { label: 'Upanga Magharibi', value: 'UPANGA_MAGHARIBI' },
-    { label: 'Upanga Mashariki', value: 'UPANGA_MASHARIKI' },
-    { label: 'Vingunguti', value: 'VINGUNGUTI' },
-  ],
-  KINONDONI: [
-    { label: 'Bunju', value: 'BUNJU' },
-    { label: 'Hananasif', value: 'HANANASIF' },
-    { label: 'Kawe', value: 'KAWE' },
-    { label: 'Kibamba', value: 'KIBAMBA' },
-    { label: 'Kijitonyama', value: 'KIJITONYAMA' },
-    { label: 'Kunduchi', value: 'KUNDUCHI' },
-    { label: 'Mabibo', value: 'MABIBO' },
-    { label: 'Magogoni', value: 'MAGOGONI' },
-    { label: 'Makongo', value: 'MAKONGO' },
-    { label: 'Makumbusho', value: 'MAKUMBUSHO' },
-    { label: 'Manzese', value: 'MANZESE' },
-    { label: 'Mbezi', value: 'MBEZI' },
-    { label: 'Mikocheni', value: 'MIKOCHENI' },
-    { label: 'Msasani', value: 'MSASANI' },
-    { label: 'Mwananyamala', value: 'MWANANYAMALA' },
-    { label: 'Ndugumbi', value: 'NDUGUMBI' },
-    { label: 'Sinza', value: 'SINZA' },
-    { label: 'Tandale', value: 'TANDALE' },
-  ],
-  UBUNGO: [
-    { label: 'Goba', value: 'GOBA' },
-    { label: 'Kimara', value: 'KIMARA' },
-    { label: 'Kibamba', value: 'KIBAMBA' },
-    { label: 'Kwembe', value: 'KWEMBE' },
-    { label: 'Makuburi', value: 'MAKUBURI' },
-    { label: 'Mbezi Juu', value: 'MBEZI_JUU' },
-    { label: 'Msigani', value: 'MSIGANI' },
-    { label: 'Saranga', value: 'SARANGA' },
-    { label: 'Sinza', value: 'SINZA' },
-    { label: 'Ubungo', value: 'UBUNGO' },
-  ],
-  TEMEKE: [
-    { label: 'Azimio', value: 'AZIMIO' },
-    { label: 'Chamazi', value: 'CHAMAZI' },
-    { label: 'Keko', value: 'KEKO' },
-    { label: 'Kiburugwa', value: 'KIBURUGWA' },
-    { label: 'Kijichi', value: 'KIJICHI' },
-    { label: 'Makangarawe', value: 'MAKANGARAWE' },
-    { label: 'Mbagala', value: 'MBAGALA' },
-    { label: 'Mbagala Kuu', value: 'MBAGALA_KUU' },
-    { label: 'Mianzini', value: 'MIANZINI' },
-    { label: 'Miburani', value: 'MIBURANI' },
-    { label: 'Mjimwema', value: 'MJIMWEMA' },
-    { label: 'Mtoni', value: 'MTONI' },
-    { label: 'Sandali', value: 'SANDALI' },
-    { label: 'Tandika', value: 'TANDIKA' },
-    { label: 'Temeke', value: 'TEMEKE' },
-    { label: 'Toangoma', value: 'TOANGOMA' },
-    { label: 'Yombo Vituka', value: 'YOMBO_VITUKA' },
-  ],
-  KIGAMBONI: [
-    { label: 'Kigamboni', value: 'KIGAMBONI' },
-    { label: 'Kimbiji', value: 'KIMBIJI' },
-    { label: 'Pemba Mnazi', value: 'PEMBA_MNAZI' },
-    { label: 'Somangila', value: 'SOMANGILA' },
-    { label: 'Vijibweni', value: 'VIJIBWENI' },
-  ],
-  
-  // Arusha - Arusha City
-  ARUSHA_CITY: [
-    { label: 'Baraa', value: 'BARAA' },
-    { label: 'Daraja Mbili', value: 'DARAJA_MBILI' },
-    { label: 'Elerai', value: 'ELERAI' },
-    { label: 'Kaloleni', value: 'KALOLENI' },
-    { label: 'Kati', value: 'KATI' },
-    { label: 'Kimandolu', value: 'KIMANDOLU' },
-    { label: 'Lemara', value: 'LEMARA' },
-    { label: 'Levolosi', value: 'LEVOLOSI' },
-    { label: 'Ngarenaro', value: 'NGARENARO' },
-    { label: 'Olorien', value: 'OLORIEN' },
-    { label: 'Sakina', value: 'SAKINA' },
-    { label: 'Sombetini', value: 'SOMBETINI' },
-    { label: 'Terrat', value: 'TERRAT' },
-    { label: 'Themi', value: 'THEMI' },
-  ],
-  
-  // Mwanza - Mwanza City
-  MWANZA_CITY: [
-    { label: 'Buhongwa', value: 'BUHONGWA' },
-    { label: 'Butimba', value: 'BUTIMBA' },
-    { label: 'Igoma', value: 'IGOMA' },
-    { label: 'Isamilo', value: 'ISAMILO' },
-    { label: 'Mahina', value: 'MAHINA' },
-    { label: 'Mbugani', value: 'MBUGANI' },
-    { label: 'Mikuyuni', value: 'MIKUYUNI' },
-    { label: 'Mirongo', value: 'MIRONGO' },
-    { label: 'Mkolani', value: 'MKOLANI' },
-    { label: 'Nyakato', value: 'NYAKATO' },
-    { label: 'Nyamanoro', value: 'NYAMANORO' },
-    { label: 'Pasiansi', value: 'PASIASI' },
-    { label: 'Pamba', value: 'PAMBA' },
-  ],
-  
-  // Mbeya - Mbeya City
-  MBEYA_CITY: [
-    { label: 'Iganjo', value: 'IGANJO' },
-    { label: 'Igawilo', value: 'IGAWILO' },
-    { label: 'Iyela', value: 'IYELA' },
-    { label: 'Itezi', value: 'ITEZI' },
-    { label: 'Itagano', value: 'ITAGANO' },
-    { label: 'Mwansekwa', value: 'MWANSEKWA' },
-    { label: 'Mwasanga', value: 'MWASANGA' },
-    { label: 'Nonde', value: 'NONDE' },
-    { label: 'Ruanda', value: 'RUANDA' },
-    { label: 'Sinde', value: 'SINDE' },
-    { label: 'Tembela', value: 'TEMBELA' },
-  ],
-  
-  // Tanga - Tanga City
-  TANGA_CITY: [
-    { label: 'Central', value: 'CENTRAL' },
-    { label: 'Chongoleani', value: 'CHONGOLEANI' },
-    { label: 'Kigoda', value: 'KIGODA' },
-    { label: 'Kijima', value: 'KIJIMA' },
-    { label: 'Kiomoni', value: 'KIOMONI' },
-    { label: 'Mabawa', value: 'MABAWA' },
-    { label: 'Majengo', value: 'MAJENGO' },
-    { label: 'Makorora', value: 'MAKORORA' },
-    { label: 'Marungu', value: 'MARUNGU' },
-    { label: 'Maweni', value: 'MAWENI' },
-    { label: 'Msambweni', value: 'MSAMBWENI' },
-    { label: 'Mzingani', value: 'MZINGANI' },
-    { label: 'Nguvumali', value: 'NGUVUMALI' },
-    { label: 'Pongwe', value: 'PONGWE' },
-    { label: 'Ras Kazone', value: 'RAS_KAZONE' },
-    { label: 'Tanga', value: 'TANGA' },
-    { label: 'Tongoni', value: 'TONGONI' },
-  ],
-};
-
-// Property features for quick selection
-const PROPERTY_FEATURES = [
-  { label: 'Vyumba 2', value: 'BEDROOMS_2', icon: 'bed' },
-  { label: 'Vyumba 3', value: 'BEDROOMS_3', icon: 'bed' },
-  { label: 'Vyumba 4+', value: 'BEDROOMS_4', icon: 'bed' },
-  { label: 'Sebule', value: 'LIVING_ROOM', icon: 'home' },
-  { label: 'Jiko la Ndani', value: 'INDOOR_KITCHEN', icon: 'zap' },
-  { label: 'Bafu ya Ndani', value: 'INDOOR_BATHROOM', icon: 'droplet' },
-  { label: 'Choo cha Ndani', value: 'INDOOR_TOILET', icon: 'droplet' },
-  { label: 'Maji', value: 'WATER', icon: 'droplet' },
-  { label: 'Umeme', value: 'ELECTRICITY', icon: 'zap' },
-  { label: 'Wifi', value: 'WIFI', icon: 'wifi' },
-  { label: 'Garage', value: 'GARAGE', icon: 'home' },
-  { label: 'Bustani', value: 'GARDEN', icon: 'home' },
-  { label: 'Ua', value: 'COMPOUND', icon: 'home' },
-  { label: 'Majiko', value: 'WATER_HEATER', icon: 'zap' },
-  { label: 'Fencing', value: 'FENCING', icon: 'shield' },
-  { label: 'Security', value: 'SECURITY', icon: 'shield' },
-  { label: 'CCTV', value: 'CCTV', icon: 'shield' },
-  { label: 'Askari', value: 'GUARD', icon: 'shield' },
-  { label: 'Furniture', value: 'FURNITURE', icon: 'home' },
-  { label: 'Air Conditioner', value: 'AC', icon: 'zap' },
-  { label: 'Ceiling Fan', value: 'FAN', icon: 'zap' },
-  { label: 'Mosquito Nets', value: 'MOSQUITO_NETS', icon: 'shield' },
-];
-
-interface FormData {
-  property_type: string;
-  living_space_type: string;
-  house_type: string;
-  room_count: number;
-  region: string;
-  district: string;
-  ward: string;
-  street: string;
-  gps_coordinates: string;
-  house_number: string;
-  house_description: string;
-  monthly_rent: number;
-  payment_period: number;
-  landlord_role: string;
-  landlord_name: string;
-  landlord_nida: string;
-  landlord_phone: string;
-  tenant_is_self: string;
-  tenant_name: string;
-  tenant_nida: string;
-  tenant_marital_status: string;
-  tenant_occupation: string;
-  tenant_living_arrangement: string;
-  family_member_count: number;
-  agreement_terms: string;
-  submitter_role: string;
-  send_for_approval: string;
-  target_user_nida: string;
-  approval_note: string;
-  agreement_accepted: boolean;
-  selected_features: string[];
+interface TenantProfile {
+  id: string; first_name: string; last_name: string; middle_name?: string;
+  nida_number?: string; phone?: string; email: string;
+  region?: string; district?: string; ward?: string;
+  is_verified: boolean; account_status: string;
 }
 
-interface LookupResult {
-  id: string;
-  citizen_id: string;
-  full_name: string;
-  phone?: string;
-  email?: string;
-}
+interface UploadedDoc { file: File; preview: string; label: string; }
 
-type Step = 'property' | 'location' | 'rent' | 'landlord' | 'tenant' | 'terms' | 'review';
+interface FormValues {
+  tenant_search_term: string; tenant_search_type: string;
+  property_type: string; property_address: string;
+  property_ward: string; property_district: string; property_region: string;
+  house_number: string; floor_level: string;
+  num_rooms: string; property_description: string;
+  monthly_rent: string; deposit_amount: string;
+  payment_day: string; payment_frequency: string;
+  lease_start: string; lease_duration: string;
+  notice_period: string;
+  included_utilities: string[]; // array of utility keys
+  house_rules: string;
+  witness1_name: string; witness1_phone: string; witness1_nida: string;
+  witness2_name: string; witness2_phone: string; witness2_nida: string;
+  special_conditions: string;
+  landlord_confirmed: boolean; terms_accepted: boolean;
+}
 
 export const MakubalianoPangoForm: React.FC<FormProps> = ({
-  onSubmit,
-  isLoading,
-  lang = 'sw',
-  userProfile
+  onSubmit, isLoading, lang = 'sw', userProfile,
 }) => {
   const t = labels[lang];
-  const [currentStep, setCurrentStep] = useState<Step>('property');
-  const [showReview, setShowReview] = useState(false);
-  
-  // Lookup states
-  const [targetCitizenId, setTargetCitizenId] = useState('');
-  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [lookupError, setLookupError] = useState('');
-  
-  // Location state
-  const [selectedRegion, setSelectedRegion] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [selectedWard, setSelectedWard] = useState('');
-  
-  // Property features state
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
-  const [customDescription, setCustomDescription] = useState('');
-  
-  const { register, handleSubmit, formState: { errors }, trigger, getValues, watch, setValue } = useForm<FormData>({
-    defaultValues: {
-      payment_period: 12,
-      monthly_rent: 0,
-    }
+  const L = (sw: string, en: string) => lang === 'sw' ? sw : en;
+
+  const [step, setStep]             = useState<Step>('landlord');
+  const [submitted, setSubmitted]   = useState(false);
+  const [appRef, setAppRef]         = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors]         = useState<Record<string, string>>({});
+  const [docs, setDocs]             = useState<UploadedDoc[]>([]);
+  const docRef                      = useRef<HTMLInputElement>(null);
+  const [docErr, setDocErr]         = useState('');
+
+  const [tenantFound, setTenantFound]         = useState<TenantProfile | null>(null);
+  const [tenantSearching, setTenantSearching] = useState(false);
+  const [tenantError, setTenantError]         = useState('');
+
+  const [vals, setVals] = useState<FormValues>({
+    tenant_search_term: '', tenant_search_type: 'NIDA',
+    property_type: '', property_address: '', property_ward: userProfile?.ward || '',
+    property_district: userProfile?.district || '', property_region: userProfile?.region || '',
+    house_number: (userProfile as any)?.house_number || '', floor_level: '',
+    num_rooms: '', property_description: '',
+    monthly_rent: '', deposit_amount: '', payment_day: '1',
+    payment_frequency: 'MONTHLY', lease_start: '', lease_duration: '1Y',
+    notice_period: '30D',
+    included_utilities: [],
+    house_rules: '',
+    witness1_name: '', witness1_phone: '', witness1_nida: '',
+    witness2_name: '', witness2_phone: '', witness2_nida: '',
+    special_conditions: '',
+    landlord_confirmed: false, terms_accepted: false,
   });
 
-  const steps: { key: Step; label: string; swLabel: string }[] = [
-    { key: 'property', label: 'Property Type', swLabel: 'Aina ya Nyumba' },
-    { key: 'location', label: 'Location', swLabel: 'Mahali' },
-    { key: 'rent', label: 'Rent Calculation', swLabel: 'Hesabu za Kodi' },
-    { key: 'landlord', label: 'Landlord', swLabel: 'Mwenye Nyumba' },
-    { key: 'tenant', label: 'Tenant', swLabel: 'Mpangaji' },
-    { key: 'terms', label: 'Terms', swLabel: 'Masharti' },
-    { key: 'review', label: 'Review', swLabel: 'Hakiki' },
+  const monthlyRent = parseFloat(vals.monthly_rent) || 0;
+  const deposit     = parseFloat(vals.deposit_amount) || 0;
+  const serviceFee  = Math.max(10000, monthlyRent);
+  const fmtTsh      = (n: number) => `TSh ${n.toLocaleString()}`;
+
+  const STEPS: { key: Step; label: string; sw: string }[] = [
+    { key: 'landlord', label: 'Landlord',  sw: 'Mpangishaji' },
+    { key: 'tenant',   label: 'Tenant',    sw: 'Mpangaji' },
+    { key: 'property', label: 'Property',  sw: 'Nyumba' },
+    { key: 'terms',    label: 'Terms',     sw: 'Masharti' },
+    { key: 'preview',  label: 'Preview',   sw: 'Hakiki' },
   ];
+  const stepIdx  = STEPS.findIndex(s => s.key === step);
+  const progress = ((stepIdx + 1) / STEPS.length) * 100;
 
-  const currentStepIndex = steps.findIndex(s => s.key === currentStep);
-  const progress = ((currentStepIndex + 1) / steps.length) * 100;
+  const set    = (k: keyof FormValues, v: string | boolean | string[]) => setVals(p => ({ ...p, [k]: v }));
+  const clrErr = (k: string) => setErrors(p => { const n = { ...p }; delete n[k]; return n; });
+  const err    = (k: string) => errors[k];
 
-  // Watch fields for calculations
-  const monthlyRent = watch('monthly_rent') || 0;
-  const paymentPeriod = watch('payment_period') || 1;
-  const propertyType = watch('property_type');
-  const livingSpaceType = watch('living_space_type');
-  const tenantIsSelf = watch('tenant_is_self');
-  const tenantLivingArrangement = watch('tenant_living_arrangement');
-  const sendForApproval = watch('send_for_approval');
-
-  // Get available districts based on selected region
-  const availableDistricts = selectedRegion ? DISTRICTS_BY_REGION[selectedRegion] || [] : [];
-  
-  // Get available wards based on selected district
-  const availableWards = selectedDistrict ? WARDS_BY_DISTRICT[selectedDistrict] || [] : [];
-
-  // Calculate fees
-  const feeBreakdown = useMemo(() => {
-    const totalRent = monthlyRent * paymentPeriod;
-    const vatAmount = Math.round(totalRent * VAT_RATE);
-    const serviceFee = Math.round(totalRent * SERVICE_FEE_RATE);
-    const grandTotal = totalRent + vatAmount + serviceFee;
-    
-    return {
-      monthlyRent,
-      paymentPeriod,
-      totalRent,
-      vatAmount,
-      serviceFee,
-      grandTotal
-    };
-  }, [monthlyRent, paymentPeriod]);
-
-  // Toggle feature selection
-  const toggleFeature = (feature: string) => {
-    setSelectedFeatures(prev => {
-      if (prev.includes(feature)) {
-        return prev.filter(f => f !== feature);
-      } else {
-        return [...prev, feature];
-      }
-    });
+  const toggleUtility = (key: string) => {
+    const curr = vals.included_utilities;
+    set('included_utilities', curr.includes(key) ? curr.filter(k => k !== key) : [...curr, key]);
   };
 
-  // Generate property description from selected features and custom description
-  const generatePropertyDescription = () => {
-    const featureLabels = selectedFeatures.map(f => {
-      const feature = PROPERTY_FEATURES.find(opt => opt.value === f);
-      return feature ? feature.label : f;
-    });
-    
-    const featuresText = featureLabels.join(', ');
-    
-    if (featuresText && customDescription) {
-      return `${featuresText}. ${customDescription}`;
-    } else if (featuresText) {
-      return featuresText;
-    } else {
-      return customDescription;
-    }
-  };
-
-  // Update form value when features or custom description change
-  useEffect(() => {
-    const description = generatePropertyDescription();
-    setValue('house_description', description);
-  }, [selectedFeatures, customDescription]);
-
-  // Citizen lookup handler
-  const handleCitizenLookup = async () => {
-    if (!targetCitizenId.trim()) {
-      setLookupError(lang === 'sw' ? 'Tafadhali ingiza Namba ya NIDA' : 'Please enter NIDA number');
-      return;
-    }
-
-    setSearching(true);
-    setLookupError('');
-    setLookupResult(null);
-
+  // ─── Tenant lookup ───────────────────────────────────────────────────────
+  const searchTenant = async () => {
+    const term = vals.tenant_search_term.trim();
+    if (!term) { setTenantError(L('Ingiza namba ya kutafuta', 'Enter a search term')); return; }
+    setTenantSearching(true); setTenantError(''); setTenantFound(null);
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, citizen_id, first_name, middle_name, last_name, phone, email')
-        .eq('citizen_id', targetCitizenId.trim().toUpperCase())
-        .single();
-
+      let query = supabase.from('profiles').select('*');
+      if (vals.tenant_search_type === 'NIDA')  query = query.eq('nida_number', term);
+      if (vals.tenant_search_type === 'PHONE') query = query.eq('phone', term);
+      if (vals.tenant_search_type === 'CT_ID') query = query.eq('citizen_id', term);
+      const { data, error } = await query.single();
       if (error || !data) {
-        setLookupError(lang === 'sw' 
-          ? 'Mtumiaji hajapatikana. Hakikisha namba ya CT ID ni sahihi.' 
-          : 'User not found. Please verify the CT ID.');
+        setTenantError(L('Mtu huyu hayupo kwenye mfumo. Lazima awe mwananchi aliyesajiliwa na kuthibitishwa.', 'Person not found. They must be a registered and verified citizen.'));
         return;
       }
-
-      setLookupResult({
-        id: data.id,
-        citizen_id: data.citizen_id,
-        full_name: `${data.first_name} ${data.middle_name || ''} ${data.last_name}`.trim(),
-        phone: data.phone,
-        email: data.email
-      });
+      if (data.account_status !== 'active' || !data.is_verified) {
+        setTenantError(L('Akaunti ya mtu huyu haijathibitishwa. Hawezi kuwa mpangaji.', 'This person\'s account is not verified. They cannot be a tenant.'));
+        return;
+      }
+      if (data.id === userProfile?.id) {
+        setTenantError(L('Huwezi kuwa mpangishaji na mpangaji wa nyumba moja.', 'You cannot be both landlord and tenant of the same property.'));
+        return;
+      }
+      setTenantFound(data as TenantProfile);
     } catch {
-      setLookupError(lang === 'sw' ? 'Hitilafu ya mtandao' : 'Network error');
+      setTenantError(L('Hitilafu ya mtandao. Jaribu tena.', 'Network error. Please try again.'));
     } finally {
-      setSearching(false);
+      setTenantSearching(false);
     }
   };
 
-  // Step validation
-  const validateCurrentStep = async (): Promise<boolean> => {
-    let fieldsToValidate: (keyof FormData)[] = [];
-    
-    switch (currentStep) {
-      case 'property':
-        fieldsToValidate = ['property_type'];
-        break;
-      case 'location':
-        fieldsToValidate = ['region', 'district', 'ward', 'street', 'house_number'];
-        break;
-      case 'rent':
-        fieldsToValidate = ['monthly_rent', 'payment_period'];
-        break;
-      case 'landlord':
-        fieldsToValidate = ['landlord_role', 'landlord_name', 'landlord_nida', 'landlord_phone'];
-        break;
-      case 'tenant':
-        fieldsToValidate = ['tenant_name', 'tenant_nida', 'tenant_marital_status', 'tenant_occupation', 'tenant_living_arrangement'];
-        break;
-      case 'terms':
-        fieldsToValidate = ['agreement_terms', 'submitter_role', 'agreement_accepted'];
-        break;
+  const addDoc = useCallback((file: File): string | null => {
+    if (!ALLOWED_DOCS.includes(file.type)) return L('Aina ya faili haikushukuliwa', 'File type not allowed');
+    if (file.size > MAX_DOC_SIZE) return L('Faili ni kubwa sana. Upeo ni 10MB', 'File too large. Max 10MB');
+    setDocs(p => [...p, { file, preview: URL.createObjectURL(file), label: file.name }]);
+    return null;
+  }, [lang]);
+  const removeDoc = (i: number) => setDocs(p => { URL.revokeObjectURL(p[i].preview); return p.filter((_, idx) => idx !== i); });
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    if (step === 'tenant' && !tenantFound) e.tenant = L('Lazima utafute na uthibitishe mpangaji kwanza', 'You must search and confirm the tenant first');
+    if (step === 'property') {
+      if (!vals.property_type) e.property_type = L('Chagua aina ya mali', 'Select property type');
+      if (!vals.property_address.trim()) e.property_address = L('Anwani ya nyumba inahitajika', 'Property address required');
+      if (!vals.monthly_rent.trim() || parseFloat(vals.monthly_rent) <= 0) e.monthly_rent = L('Kodi ya kila mwezi inahitajika', 'Monthly rent required');
+      if (!vals.lease_start) e.lease_start = L('Tarehe ya kuanza inahitajika', 'Start date required');
     }
-    
-    return trigger(fieldsToValidate);
-  };
-
-  const handleNext = async () => {
-    const isValid = await validateCurrentStep();
-    if (isValid) {
-      const nextIndex = currentStepIndex + 1;
-      if (nextIndex < steps.length) {
-        setCurrentStep(steps[nextIndex].key);
-      }
-      if (currentStep === 'terms') {
-        setShowReview(true);
-      }
+    if (step === 'terms') {
+      if (!vals.witness1_name.trim()) e.witness1_name = L('Jina la shahidi 1 linahitajika', 'Witness 1 name required');
+      if (!vals.witness1_phone.trim()) e.witness1_phone = L('Simu ya shahidi 1 inahitajika', 'Witness 1 phone required');
+      if (!vals.witness2_name.trim()) e.witness2_name = L('Jina la shahidi 2 linahitajika', 'Witness 2 name required');
+      if (!vals.witness2_phone.trim()) e.witness2_phone = L('Simu ya shahidi 2 inahitajika', 'Witness 2 phone required');
     }
-  };
-
-  const handlePrevious = () => {
-    const prevIndex = currentStepIndex - 1;
-    if (prevIndex >= 0) {
-      setCurrentStep(steps[prevIndex].key);
+    if (step === 'preview') {
+      if (!vals.landlord_confirmed) e.landlord_confirmed = L('Mpangishaji lazima athibitishe', 'Landlord must confirm');
+      if (!vals.terms_accepted) e.terms_accepted = L('Lazima ukubali masharti', 'Must accept terms');
     }
+    setErrors(e); return Object.keys(e).length === 0;
   };
 
-  const onFormSubmit = async (data: FormData) => {
-    const submitData = {
-      ...data,
-      vat_amount: feeBreakdown.vatAmount,
-      service_fee: feeBreakdown.serviceFee,
-      total_rent: feeBreakdown.grandTotal,
-      target_user_id: lookupResult?.id || null,
-      target_user_name: lookupResult?.full_name || null,
-      selected_features: selectedFeatures,
-    };
+  const goNext = () => { if (validate()) { const n = STEPS[stepIdx + 1]; if (n) setStep(n.key); } };
+  const goPrev = () => { const p = STEPS[stepIdx - 1]; if (p) setStep(p.key); };
 
-    onSubmit(submitData);
+  const handleSubmit = async () => {
+    if (!validate()) return;
+    setSubmitting(true);
+    try {
+      const ref = `RA-${new Date().getFullYear()}-${Math.floor(Math.random() * 900000 + 100000)}`;
+      await onSubmit({
+        ...vals, tenant_id: tenantFound?.id, tenant_name: `${tenantFound?.first_name} ${tenantFound?.last_name}`,
+        tenant_nida: tenantFound?.nida_number, tenant_phone: tenantFound?.phone,
+        landlord_id: userProfile?.id, total_fee: serviceFee,
+        service_name: 'Makubaliano ya Pango', application_reference: ref,
+      }, docs.map(d => d.file));
+      setAppRef(ref); setSubmitted(true);
+    } catch { } finally { setSubmitting(false); }
   };
 
-  const confirmSubmit = () => {
-    handleSubmit(onFormSubmit)();
-  };
+  // ─── Shared UI ───────────────────────────────────────────────────────────
+  const inputCls = (name: string) =>
+    `w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all bg-white text-sm ${err(name) ? 'border-red-400 bg-red-50' : 'border-stone-200'}`;
+  const lbl    = 'block text-xs font-bold text-stone-600 uppercase tracking-wider mb-1.5';
+  const secHdr = 'bg-gradient-to-r from-teal-50 to-cyan-50 px-4 py-3 rounded-xl border-l-4 border-teal-500 mb-4';
 
-  // Styling classes
-  const inputClass = "w-full p-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all bg-white";
-  const labelClass = "block text-sm font-semibold text-stone-700 mb-2";
-  const sectionClass = "bg-linear-to-r from-emerald-50 to-teal-50 p-4 rounded-xl border-l-4 border-emerald-500 mb-6 shadow-sm";
+  const Field = ({ name, label, required, hint, children: ch }: {
+    name: string; label: string; required?: boolean; hint?: string; children: React.ReactNode;
+  }) => (
+    <div>
+      <label className={lbl}>{label}{required && <span className="text-red-500 ml-0.5">*</span>}</label>
+      {ch}
+      {err(name) && <p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11}/>{err(name)}</p>}
+      {hint && !err(name) && <p className="text-stone-400 text-xs mt-1">{hint}</p>}
+    </div>
+  );
+  const Sel = ({ name, value, onChange, options, placeholder }: {
+    name: string; value: string; onChange: (v: string) => void; options: {label:string;value:string}[]; placeholder?: string;
+  }) => (
+    <select value={value} onChange={e => { onChange(e.target.value); clrErr(name); }} className={inputCls(name)}>
+      <option value="">{placeholder || t.select}</option>
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+  const TI = ({ name, value, onChange, placeholder, type = 'text' }: {
+    name: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+  }) => (
+    <input type={type} value={value} onChange={e => { onChange(e.target.value); clrErr(name); }}
+      placeholder={placeholder} className={inputCls(name)} />
+  );
 
-  // Progress bar component
   const ProgressBar = () => (
-    <div className="mb-8">
+    <div className="mb-6">
       <div className="flex justify-between mb-2">
-        {steps.map((step, index) => (
-          <div 
-            key={step.key}
-            className={`flex flex-col items-center ${index <= currentStepIndex ? 'text-emerald-600' : 'text-stone-400'}`}
-          >
-            <div className={`
-              w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mb-1
-              ${index < currentStepIndex 
-                ? 'bg-emerald-600 text-white' 
-                : index === currentStepIndex
-                ? 'bg-emerald-100 text-emerald-600 border-2 border-emerald-600'
-                : 'bg-stone-100 text-stone-400'
-              }
-            `}>
-              {index < currentStepIndex ? <CheckCircle className="h-4 w-4" /> : index + 1}
+        {STEPS.map((s, i) => (
+          <div key={s.key} className={`flex flex-col items-center ${i <= stepIdx ? 'text-teal-600' : 'text-stone-300'}`}>
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-[10px] sm:text-xs border-2 transition-all
+              ${i < stepIdx ? 'bg-teal-600 border-teal-600 text-white' : i === stepIdx ? 'bg-teal-50 border-teal-600 text-teal-700' : 'bg-stone-100 border-stone-200 text-stone-400'}`}>
+              {i < stepIdx ? <Check size={12}/> : i + 1}
             </div>
-            <span className="text-xs font-medium hidden sm:block">
-              {lang === 'sw' ? step.swLabel : step.label}
-            </span>
+            <span className="text-[8px] sm:text-[9px] font-semibold mt-0.5 hidden sm:block">{lang === 'sw' ? s.sw : s.label}</span>
           </div>
         ))}
       </div>
       <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
-        <ProgressFill progress={progress} className="bg-linear-to-r from-emerald-500 to-teal-500 h-2 rounded-full transition-all duration-300" />
+        <ProgressFill progress={progress} className="bg-gradient-to-r from-teal-500 to-cyan-500 h-2 rounded-full transition-all duration-500"/>
       </div>
-      <div className="flex justify-between mt-2">
-        <span className="text-xs text-stone-500">
-          {lang === 'sw' ? 'Hatua' : 'Step'} {currentStepIndex + 1} {lang === 'sw' ? 'kati ya' : 'of'} {steps.length}
-        </span>
-        <span className="text-xs font-bold text-emerald-600">{Math.round(progress)}%</span>
+      <div className="flex justify-between mt-1.5">
+        <span className="text-xs text-stone-500 font-medium">{L(`Hatua ${stepIdx + 1} kati ya ${STEPS.length}`, `Step ${stepIdx + 1} of ${STEPS.length}`)}</span>
+        <span className="text-xs font-bold text-teal-600">{Math.round(progress)}%</span>
       </div>
     </div>
   );
 
-  // Review section component
-  const ReviewSection = () => {
-    const data = getValues();
-    
-    return (
-      <div className="space-y-6">
-        <div className={sectionClass}>
-          <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-            <Eye className="h-5 w-5" />
-            {lang === 'sw' ? 'HAKIKI MAKUBALIANO YA PANGO' : 'REVIEW RENT AGREEMENT'}
-          </h3>
-        </div>
+  const PSection = ({ icon, title, stepKey, children: ch }: { icon: React.ReactNode; title: string; stepKey: Step; children: React.ReactNode }) => (
+    <div className="bg-white border border-stone-100 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-teal-50 px-4 py-2.5 border-b border-teal-100 flex items-center justify-between">
+        <div className="flex items-center gap-2"><span className="text-teal-600">{icon}</span><h4 className="font-bold text-teal-900 text-sm">{title}</h4></div>
+        <button type="button" onClick={() => setStep(stepKey)} className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-800 font-bold hover:bg-teal-100 px-2 py-1 rounded-lg transition-colors">
+          <Edit2 size={11}/> {L('Hariri', 'Edit')}
+        </button>
+      </div>
+      <div className="p-4 grid grid-cols-2 gap-x-4 gap-y-2">{ch}</div>
+    </div>
+  );
+  const PRow = ({ label, value }: { label: string; value: string | undefined }) => (
+    <><p className="text-xs text-stone-500">{label}</p><p className="text-xs font-bold text-stone-800 text-right break-words">{value || '—'}</p></>
+  );
 
-        {/* Property Summary */}
-        <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
-          <h4 className="font-bold text-stone-800 flex items-center gap-2">
-            <Building className="h-4 w-4" />
-            {lang === 'sw' ? 'Taarifa za Nyumba' : 'Property Details'}
-          </h4>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <span className="text-stone-500">{lang === 'sw' ? 'Aina:' : 'Type:'}</span>
-              <p className="font-medium">{PROPERTY_TYPES.find(p => p.value === data.property_type)?.label}</p>
-            </div>
-            <div>
-              <span className="text-stone-500">{lang === 'sw' ? 'Namba:' : 'Number:'}</span>
-              <p className="font-medium">{data.house_number}</p>
-            </div>
-            <div className="col-span-2">
-              <span className="text-stone-500">{lang === 'sw' ? 'Mahali:' : 'Location:'}</span>
-              <p className="font-medium">{data.street}, {data.ward}, {data.district}, {data.region}</p>
-            </div>
-            <div className="col-span-2">
-              <span className="text-stone-500">{lang === 'sw' ? 'Maelezo:' : 'Description:'}</span>
-              <p className="font-medium">{data.house_description}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Rent Summary */}
-        <div className="bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
-          <h4 className="font-bold text-emerald-800 mb-3 flex items-center gap-2">
-            <Calculator className="h-4 w-4" />
-            {lang === 'sw' ? 'Muhtasari wa Malipo' : 'Payment Summary'}
-          </h4>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-stone-600">{lang === 'sw' ? 'Kodi ya Mwezi:' : 'Monthly Rent:'}</span>
-              <span className="font-medium">{feeBreakdown.monthlyRent.toLocaleString()} TZS</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-stone-600">{lang === 'sw' ? 'Muda (Miezi):' : 'Period (Months):'}</span>
-              <span className="font-medium">{feeBreakdown.paymentPeriod}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-stone-600">{lang === 'sw' ? 'Jumla ya Kodi:' : 'Total Rent:'}</span>
-              <span className="font-medium">{feeBreakdown.totalRent.toLocaleString()} TZS</span>
-            </div>
-            <div className="border-t border-emerald-200 my-2"></div>
-            <div className="flex justify-between text-sm">
-              <span className="text-stone-600">VAT (18%):</span>
-              <span className="font-medium">{feeBreakdown.vatAmount.toLocaleString()} TZS</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-stone-600">{lang === 'sw' ? 'Ada ya Huduma (3%):' : 'Service Fee (3%):'}</span>
-              <span className="font-medium">{feeBreakdown.serviceFee.toLocaleString()} TZS</span>
-            </div>
-            <div className="border-t border-emerald-200 my-2"></div>
-            <div className="flex justify-between font-bold text-lg">
-              <span className="text-emerald-800">{lang === 'sw' ? 'JUMLA:' : 'TOTAL:'}</span>
-              <span className="text-emerald-600">{feeBreakdown.grandTotal.toLocaleString()} TZS</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Parties Summary */}
-        <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
-          <h4 className="font-bold text-stone-800 flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            {lang === 'sw' ? 'Pande za Makubaliano' : 'Agreement Parties'}
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-emerald-50 p-3 rounded-lg">
-              <span className="text-xs text-emerald-600 font-medium">{lang === 'sw' ? 'MWENYE NYUMBA' : 'LANDLORD'}</span>
-              <p className="font-bold text-emerald-800">{data.landlord_name}</p>
-              <p className="text-sm text-emerald-600">{data.landlord_nida}</p>
-            </div>
-            <div className="bg-teal-50 p-3 rounded-lg">
-              <span className="text-xs text-teal-600 font-medium">{lang === 'sw' ? 'MPANGAJI' : 'TENANT'}</span>
-              <p className="font-bold text-teal-800">{data.tenant_name}</p>
-              <p className="text-sm text-teal-600">{data.tenant_nida}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Important Notices */}
-        <div className="space-y-3">
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <Bell className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-bold text-blue-800 mb-1">
-                  {lang === 'sw' ? 'Arifa kwa Mhusika' : 'Notification to Second Party'}
-                </h4>
-                <p className="text-sm text-blue-700">
-                  {lang === 'sw' 
-                    ? 'Baada ya kuwasilisha, upande mwingine utapokea arifa ya kukagua na kuidhinisha makubaliano haya.'
-                    : 'After submission, the other party will receive a notification to review and approve this agreement.'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <Shield className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-bold text-emerald-800 mb-1">
-                  {lang === 'sw' ? 'Uhalali wa Mkataba' : 'Agreement Validity'}
-                </h4>
-                <p className="text-sm text-emerald-700">
-                  {lang === 'sw' 
-                    ? 'Mkataba huu utakuwa na nguvu ya kisheria baada ya pande zote mbili kukubali na malipo kukamilika.'
-                    : 'This agreement will be legally binding after both parties accept and payment is completed.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3 pt-4">
-          <button
-            type="button"
-            onClick={() => setShowReview(false)}
-            className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            {lang === 'sw' ? 'Rudi' : 'Back'}
-          </button>
-          <button
-            type="button"
-            onClick={confirmSubmit}
-            disabled={isLoading}
-            className="flex-1 py-3 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <>
-                <FileCheck className="h-5 w-5" />
-                {lang === 'sw' ? 'Wasilisha Mkataba' : 'Submit Agreement'}
-              </>
-            )}
-          </button>
+  // ─── Success screen ───────────────────────────────────────────────────────
+  if (submitted) return (
+    <div className="text-center space-y-6 py-4">
+      <div className="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center mx-auto"><CheckCircle2 size={40} className="text-teal-600"/></div>
+      <div className="space-y-2">
+        <h3 className="text-xl font-black text-stone-900">{L('Makubaliano Yamewasilishwa!', 'Agreement Submitted!')}</h3>
+        <p className="text-stone-500 text-sm">{L('Makubaliano ya Pango yamewasilishwa. Baada ya idhini ya Ofisi, pande zote mbili zitapokea nakala.', 'Rental Agreement submitted. After office approval, both parties will receive a copy.')}</p>
+      </div>
+      <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 text-left space-y-3 max-w-sm mx-auto">
+        <p className="text-xs font-black text-teal-700 uppercase tracking-wider">{L('Namba ya Makubaliano', 'Agreement Reference')}</p>
+        <p className="text-2xl font-black text-teal-800 font-mono">{appRef}</p>
+        <div className="space-y-2 pt-2 border-t border-teal-200">
+          {[
+            [L('Mpangishaji', 'Landlord'), `${userProfile?.first_name} ${userProfile?.last_name}`],
+            [L('Mpangaji', 'Tenant'), `${tenantFound?.first_name} ${tenantFound?.last_name}`],
+            [L('Kodi ya Kila Mwezi', 'Monthly Rent'), monthlyRent > 0 ? fmtTsh(monthlyRent) : '—'],
+            [L('Amana', 'Deposit'), deposit > 0 ? fmtTsh(deposit) : '—'],
+            [L('Ada ya Huduma', 'Service Fee'), fmtTsh(serviceFee)],
+            [L('Hali', 'Status'), L('Inasubiri Idhini ya Ofisi', 'Pending Office Approval')],
+          ].map(([l, v]) => (
+            <div key={String(l)} className="flex justify-between text-sm"><span className="text-stone-500">{l}</span><span className="font-bold text-stone-800 text-right">{v}</span></div>
+          ))}
         </div>
       </div>
-    );
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-left max-w-sm mx-auto">
+        <p className="text-xs font-bold text-blue-700 mb-2">{L('Hatua Zinazofuata', 'What Happens Next')}</p>
+        <ul className="space-y-1.5">
+          {[
+            L('Ofisi itakagua makubaliano na kuthibitisha pande zote mbili', 'Office will review agreement and verify both parties'),
+            L('Mpangishaji NA Mpangaji wataarifiwa kwa simu/barua pepe', 'Landlord AND Tenant will be notified by phone/email'),
+            L(`Lipa ada ya ${fmtTsh(serviceFee)} unapokuja kuchukua nakala`, `Pay ${fmtTsh(serviceFee)} when collecting copies`),
+            L('Pande zote mbili zitapata nakala rasmi iliyosainiwa na Ofisi', 'Both parties will receive an official copy signed by the Office'),
+          ].map((item, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-blue-700">
+              <span className="w-4 h-4 rounded-full bg-blue-200 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">{i + 1}</span>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+
+  const renderStep = () => {
+    switch (step) {
+
+      case 'landlord': return (
+        <div className="space-y-5">
+          <div className={secHdr}>
+            <p className="font-bold text-teal-800 text-sm flex items-center gap-2"><Key size={16}/> {L('TAARIFA ZA MPANGISHAJI', 'LANDLORD INFORMATION')}</p>
+            <p className="text-xs text-teal-600 mt-0.5">{L('Wewe ndiye mpangishaji — taarifa zako zimechukuliwa kutoka kwenye wasifu wako', 'You are the landlord — your details are taken from your profile')}</p>
+          </div>
+          {userProfile?.is_verified ? (
+            <div className="bg-teal-50 border border-teal-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <UserCheck size={16} className="text-teal-600"/>
+                <span className="text-xs font-bold text-teal-700 uppercase tracking-wide">{L('Mpangishaji Aliyethibitishwa', 'Verified Landlord')}</span>
+                <span className="ml-auto text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">✓ {L('IMETHIBITISHWA', 'VERIFIED')}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  [L('Jina Kamili', 'Full Name'), `${userProfile.first_name || ''} ${userProfile.middle_name || ''} ${userProfile.last_name || ''}`.trim()],
+                  ['NIDA', userProfile.nida_number || '—'],
+                  [L('Simu', 'Phone'), userProfile.phone || '—'],
+                  ['Email', userProfile.email || '—'],
+                  [L('Mkoa', 'Region'), userProfile.region || '—'],
+                  [L('Wilaya / Kata', 'District / Ward'), `${userProfile.district || ''} / ${userProfile.ward || ''}`.replace(/^ \/ $/, '—')],
+                ].map(([l, v]) => (
+                  <div key={String(l)} className="bg-white rounded-lg px-3 py-2">
+                    <p className="text-[9px] text-stone-400 uppercase tracking-wide">{l}</p>
+                    <p className="text-xs font-bold text-stone-800 truncate">{v}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3">
+              <UserX size={18} className="text-red-500 shrink-0 mt-0.5"/>
+              <div>
+                <p className="text-sm font-bold text-red-700">{L('Akaunti Yako Haijathibitishwa', 'Your Account is Not Verified')}</p>
+                <p className="text-xs text-red-600 mt-1">{L('Lazima akaunti yako ithibitishwe kabla ya kutumia huduma hii.', 'Your account must be verified before using this service.')}</p>
+              </div>
+            </div>
+          )}
+          <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 flex gap-2">
+            <Info size={14} className="text-teal-500 shrink-0 mt-0.5"/>
+            <p className="text-xs text-teal-700">{L('Makubaliano ya Pango yanafanywa kati ya Mpangishaji (mwenye nyumba) na Mpangaji (mtumiaji wa nyumba). Wote lazima wawe wananchi waliothibitishwa kwenye mfumo.', 'A Rental Agreement is between a Landlord (property owner) and Tenant (occupier). Both must be verified citizens in the system.')}</p>
+          </div>
+        </div>
+      );
+
+      case 'tenant': return (
+        <div className="space-y-5">
+          <div className={secHdr}>
+            <p className="font-bold text-teal-800 text-sm flex items-center gap-2"><Search size={16}/> {L('TAFUTA MPANGAJI', 'FIND THE TENANT')}</p>
+            <p className="text-xs text-teal-600 mt-0.5">{L('Ingiza namba ya NIDA, simu, au CT ID ya mpangaji', 'Enter the tenant\'s NIDA, phone or CT ID to search')}</p>
+          </div>
+          <Field name="tenant_search_type" label={L('Tafuta Kwa', 'Search By')}>
+            <div className="grid grid-cols-3 gap-2">
+              {[{ value: 'NIDA', label: 'NIDA' }, { value: 'PHONE', label: L('Simu', 'Phone') }, { value: 'CT_ID', label: 'CT ID' }].map(opt => (
+                <button key={opt.value} type="button" onClick={() => { set('tenant_search_type', opt.value); setTenantFound(null); setTenantError(''); }}
+                  className={`py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${vals.tenant_search_type === opt.value ? 'bg-teal-50 border-teal-500 text-teal-700' : 'bg-white border-stone-200 text-stone-500 hover:border-stone-300'}`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field name="tenant" label={L(`Namba ya ${vals.tenant_search_type === 'PHONE' ? 'Simu' : vals.tenant_search_type}`, `${vals.tenant_search_type === 'PHONE' ? 'Phone' : vals.tenant_search_type} Number`)} required>
+            <div className="flex gap-2">
+              <input value={vals.tenant_search_term}
+                onChange={e => { set('tenant_search_term', e.target.value); setTenantFound(null); setTenantError(''); clrErr('tenant'); }}
+                placeholder={vals.tenant_search_type === 'PHONE' ? '+255 7XX XXX XXX' : vals.tenant_search_type === 'CT_ID' ? 'CT2026A00001' : 'XXXX-XXXX-XXXX-XXXX-XXXX'}
+                className={`flex-1 ${inputCls('tenant')}`}
+                onKeyDown={e => e.key === 'Enter' && searchTenant()} />
+              <button type="button" onClick={searchTenant} disabled={tenantSearching}
+                className="px-4 py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white rounded-xl font-bold text-sm flex items-center gap-2 transition-colors">
+                {tenantSearching ? <Loader2 size={15} className="animate-spin"/> : <Search size={15}/>}
+                <span className="hidden sm:inline">{L('Tafuta', 'Search')}</span>
+              </button>
+            </div>
+          </Field>
+          {tenantError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+              <UserX size={15} className="text-red-500 shrink-0 mt-0.5"/>
+              <p className="text-xs text-red-700 font-medium">{tenantError}</p>
+            </div>
+          )}
+          {tenantFound && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <UserCheck size={16} className="text-emerald-600"/>
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">{L('Mpangaji Amepatikana na Kuthibitishwa', 'Tenant Found & Verified')}</span>
+                <span className="ml-auto text-[10px] font-black text-emerald-700 bg-emerald-200 px-2 py-0.5 rounded-full">✓ {L('AKTIV', 'ACTIVE')}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  [L('Jina Kamili', 'Full Name'), `${tenantFound.first_name} ${tenantFound.middle_name || ''} ${tenantFound.last_name}`.trim()],
+                  ['NIDA', tenantFound.nida_number || '—'],
+                  [L('Simu', 'Phone'), tenantFound.phone || '—'],
+                  [L('Mkoa', 'Region'), tenantFound.region || '—'],
+                  [L('Wilaya', 'District'), tenantFound.district || '—'],
+                  [L('Kata', 'Ward'), tenantFound.ward || '—'],
+                ].map(([l, v]) => (
+                  <div key={String(l)} className="bg-white rounded-lg px-3 py-2">
+                    <p className="text-[9px] text-stone-400 uppercase tracking-wide">{l}</p>
+                    <p className="text-xs font-bold text-stone-800 truncate">{v}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-emerald-600 mt-3 font-medium">{L('✓ Hii ndiyo taarifa za mpangaji. Hakikisha ni sahihi kabla ya kuendelea.', '✓ These are the tenant\'s details. Confirm they are correct before proceeding.')}</p>
+            </div>
+          )}
+        </div>
+      );
+
+      case 'property': return (
+        <div className="space-y-5">
+          <div className={secHdr}>
+            <p className="font-bold text-teal-800 text-sm flex items-center gap-2"><Home size={16}/> {L('TAARIFA ZA NYUMBA / MALI', 'PROPERTY DETAILS')}</p>
+          </div>
+          <Field name="property_type" label={L('Aina ya Mali', 'Property Type')} required>
+            <Sel name="property_type" value={vals.property_type} onChange={v => { set('property_type', v); clrErr('property_type'); }} options={PROPERTY_TYPES}/>
+          </Field>
+          <Field name="property_address" label={L('Anwani Kamili ya Nyumba', 'Full Property Address')} required
+            hint={L('Mtaa, Kata, Wilaya, Mkoa', 'Street, Ward, District, Region')}>
+            <TI name="property_address" value={vals.property_address} onChange={v => { set('property_address', v); clrErr('property_address'); }}
+              placeholder={L('Mfano: Sinza B, Makonde St, No. 12, Kinondoni, Dar es Salaam', 'E.g. Sinza B, Makonde St, No. 12, Kinondoni, Dar es Salaam')}/>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field name="num_rooms" label={L('Idadi ya Vyumba (Hiari)', 'Number of Rooms (Optional)')}>
+              <TI name="num_rooms" value={vals.num_rooms} onChange={v => set('num_rooms', v)} placeholder={L('Mfano: 3', 'E.g. 3')}/>
+            </Field>
+            <Field name="floor_level" label={L('Ghorofa (Hiari)', 'Floor Level (Optional)')}>
+              <TI name="floor_level" value={vals.floor_level} onChange={v => set('floor_level', v)} placeholder={L('Mfano: Ghorofa 2', 'E.g. Floor 2')}/>
+            </Field>
+          </div>
+          {/* Utilities included */}
+          <Field name="utilities" label={L('Huduma Zilizojumuishwa katika Kodi', 'Utilities Included in Rent')}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
+              {UTILITIES_OPTIONS.map(u => (
+                <button key={u.key} type="button" onClick={() => toggleUtility(u.key)}
+                  className={`py-2 px-3 rounded-xl border-2 text-xs font-bold transition-all flex items-center gap-1.5 ${vals.included_utilities.includes(u.key) ? 'bg-teal-50 border-teal-500 text-teal-700' : 'bg-white border-stone-200 text-stone-500'}`}>
+                  <span>{u.icon}</span> {lang === 'sw' ? u.label.split('(')[0].trim() : u.label.split('(')[1]?.replace(')', '') || u.label.split('(')[0].trim()}
+                </button>
+              ))}
+            </div>
+          </Field>
+          {/* Rent & financial */}
+          <div className="border border-teal-200 rounded-xl overflow-hidden">
+            <div className="bg-teal-50 px-4 py-2.5 border-b border-teal-100">
+              <p className="text-xs font-bold text-teal-700 uppercase tracking-wide">{L('MALIPO NA MUDA WA MKATABA', 'PAYMENT & LEASE TERMS')}</p>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Field name="monthly_rent" label={L('Kodi ya Kila Mwezi (TSh)', 'Monthly Rent (TSh)')} required>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 text-xs font-bold pointer-events-none">TSh</span>
+                    <input type="number" value={vals.monthly_rent} onChange={e => { set('monthly_rent', e.target.value); clrErr('monthly_rent'); }}
+                      placeholder="300,000" className={`${inputCls('monthly_rent')} pl-12`}/>
+                  </div>
+                </Field>
+                <Field name="deposit_amount" label={L('Amana (TSh)', 'Deposit (TSh)')}
+                  hint={L('Kawaida miezi 1-3 ya kodi', 'Usually 1–3 months rent')}>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 text-xs font-bold pointer-events-none">TSh</span>
+                    <input type="number" value={vals.deposit_amount} onChange={e => set('deposit_amount', e.target.value)}
+                      placeholder="600,000" className={`${inputCls('deposit_amount')} pl-12`}/>
+                  </div>
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field name="payment_frequency" label={L('Mzunguko wa Malipo', 'Payment Frequency')}>
+                  <Sel name="payment_frequency" value={vals.payment_frequency} onChange={v => set('payment_frequency', v)} options={PAYMENT_FREQ}/>
+                </Field>
+                <Field name="payment_day" label={L('Siku ya Kulipa (ya Mwezi)', 'Payment Day (of Month)')}
+                  hint={L('Mfano: 1, 5, au 15', 'E.g. 1st, 5th, or 15th')}>
+                  <TI name="payment_day" value={vals.payment_day} onChange={v => set('payment_day', v)} placeholder="1"/>
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field name="lease_start" label={L('Tarehe ya Kuanza', 'Lease Start Date')} required>
+                  <TI name="lease_start" value={vals.lease_start} type="date" onChange={v => { set('lease_start', v); clrErr('lease_start'); }}/>
+                </Field>
+                <Field name="lease_duration" label={L('Muda wa Mkataba', 'Lease Duration')}>
+                  <Sel name="lease_duration" value={vals.lease_duration} onChange={v => set('lease_duration', v)} options={LEASE_DURATION}/>
+                </Field>
+              </div>
+              <Field name="notice_period" label={L('Kipindi cha Taarifa ya Kutoka', 'Notice Period to Vacate')}>
+                <Sel name="notice_period" value={vals.notice_period} onChange={v => set('notice_period', v)} options={NOTICE_PERIODS}/>
+              </Field>
+            </div>
+          </div>
+          {monthlyRent > 0 && (
+            <div className="bg-teal-50 border border-teal-100 rounded-xl px-4 py-3 flex justify-between items-center">
+              <div><span className="text-xs text-stone-500">{L('Ada ya Huduma', 'Service Fee')}</span><p className="text-xs text-teal-600">{L('(kodi 1 mwezi au TSh 10,000 — kilicho kikubwa)', '(1 month rent or TSh 10,000 — whichever is greater)')}</p></div>
+              <span className="font-black text-teal-700">{fmtTsh(serviceFee)}</span>
+            </div>
+          )}
+          {/* Documents */}
+          <div>
+            <label className={lbl}>{L('Nyaraka za Nyumba (Hiari)', 'Property Documents (Optional)')}</label>
+            <p className="text-xs text-stone-400 mb-2">{L('Mfano: Picha za nyumba, hati ya umiliki, risiti ya kodi iliyopita', 'E.g. Property photos, ownership certificate, previous rent receipt')}</p>
+            <div onClick={() => docRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-4 cursor-pointer transition-all text-center ${docs.length > 0 ? 'border-teal-400 bg-teal-50' : 'border-stone-300 hover:border-teal-400 hover:bg-teal-50/40'}`}>
+              {docs.length > 0 ? (
+                <div className="space-y-2">
+                  {docs.map((doc, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-white rounded-lg p-2 shadow-sm">
+                      {doc.file.type.startsWith('image/') ? <img src={doc.preview} className="w-9 h-9 object-cover rounded-lg shrink-0" alt=""/> : <div className="w-9 h-9 bg-teal-100 rounded-lg flex items-center justify-center shrink-0"><FileText size={15} className="text-teal-600"/></div>}
+                      <div className="flex-1 min-w-0 text-left"><p className="text-xs font-bold text-stone-700 truncate">{doc.file.name}</p><p className="text-xs text-stone-400">{(doc.file.size/1024).toFixed(0)} KB</p></div>
+                      <button type="button" onClick={e => { e.stopPropagation(); removeDoc(i); }} className="p-1.5 text-red-400 hover:text-red-600 rounded-full"><X size={13}/></button>
+                    </div>
+                  ))}
+                  <p className="text-xs text-teal-600 font-medium">{L('Bonyeza kuongeza zaidi', 'Click to add more')}</p>
+                </div>
+              ) : (
+                <div className="py-3"><Upload size={22} className="mx-auto text-stone-400 mb-2"/><p className="text-sm font-semibold text-stone-600">{L('Bonyeza kupakia', 'Click to upload')}</p><p className="text-xs text-stone-400 mt-1">JPG, PNG, PDF · Max 10MB</p></div>
+              )}
+            </div>
+            <input ref={docRef} type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={e => { const files = Array.from(e.target.files||[]); let le=''; files.forEach(f => { const er = addDoc(f); if(er) le=er; }); if(le) setDocErr(le); else setDocErr(''); e.target.value=''; }} className="hidden"/>
+            {docErr && <p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11}/>{docErr}</p>}
+          </div>
+        </div>
+      );
+
+      case 'terms': return (
+        <div className="space-y-5">
+          <div className={secHdr}>
+            <p className="font-bold text-teal-800 text-sm flex items-center gap-2"><FileCheck size={16}/> {L('MASHARTI NA SHAHIDI', 'TERMS & WITNESSES')}</p>
+          </div>
+          <Field name="house_rules" label={L('Kanuni za Nyumba (Hiari)', 'House Rules (Optional)')}
+            hint={L('Mfano: Marufuku ya kelele baada ya saa 4 usiku, marufuku ya wanyama wa kufugwa, n.k.', 'E.g. No noise after 10pm, no pets, etc.')}>
+            <textarea value={vals.house_rules} onChange={e => set('house_rules', e.target.value)}
+              rows={3} placeholder={L('Kanuni za nyumba zinazokubaliana na pande zote...', 'House rules agreed by both parties...')}
+              className={`${inputCls('house_rules')} resize-none`}/>
+          </Field>
+          <Field name="special_conditions" label={L('Masharti Maalum Mengine (Hiari)', 'Other Special Conditions (Optional)')}>
+            <textarea value={vals.special_conditions} onChange={e => set('special_conditions', e.target.value)}
+              rows={3} placeholder={L('Masharti yoyote ya ziada yanayokubaliana na pande zote mbili...', 'Any additional terms agreed by both parties...')}
+              className={`${inputCls('special_conditions')} resize-none`}/>
+          </Field>
+          {[{ num: 1, nameKey: 'witness1_name' as const, phoneKey: 'witness1_phone' as const, nidaKey: 'witness1_nida' as const },
+            { num: 2, nameKey: 'witness2_name' as const, phoneKey: 'witness2_phone' as const, nidaKey: 'witness2_nida' as const }
+          ].map(w => (
+            <div key={w.num} className="border border-stone-200 rounded-xl overflow-hidden">
+              <div className="bg-stone-50 px-4 py-2.5 border-b border-stone-100 flex items-center gap-2">
+                <Users size={13} className="text-stone-500"/>
+                <span className="text-xs font-bold text-stone-700 uppercase tracking-wide">{L(`SHAHIDI ${w.num}`, `WITNESS ${w.num}`)} *</span>
+              </div>
+              <div className="p-4 space-y-3">
+                <Field name={w.nameKey} label={L('Jina Kamili', 'Full Name')} required>
+                  <TI name={w.nameKey} value={vals[w.nameKey]} onChange={v => { set(w.nameKey, v); clrErr(w.nameKey); }} placeholder={L('Jina kamili la shahidi', "Witness's full name")}/>
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field name={w.phoneKey} label={L('Simu', 'Phone')} required>
+                    <TI name={w.phoneKey} value={vals[w.phoneKey]} onChange={v => { set(w.phoneKey, v); clrErr(w.phoneKey); }} placeholder="+255 7XX XXX XXX"/>
+                  </Field>
+                  <Field name={w.nidaKey} label={L('NIDA (Hiari)', 'NIDA (Optional)')}>
+                    <TI name={w.nidaKey} value={vals[w.nidaKey]} onChange={v => set(w.nidaKey, v)} placeholder="XXXX-XXXX..."/>
+                  </Field>
+                </div>
+              </div>
+            </div>
+          ))}
+          <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 flex gap-2">
+            <Shield size={14} className="text-teal-500 shrink-0 mt-0.5"/>
+            <p className="text-xs text-teal-700">{L('Mashahidi wawili wanahitajika kisheria. Wasijuane na mpangishaji au mpangaji kwa karibu sana.', 'Two witnesses are legally required. They should not be closely related to either the landlord or tenant.')}</p>
+          </div>
+        </div>
+      );
+
+      case 'preview': return (
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+            <Eye size={18} className="text-amber-600 shrink-0 mt-0.5"/>
+            <div>
+              <p className="font-bold text-amber-800 text-sm">{L('Hakiki Makubaliano Kabla ya Kuwasilisha', 'Review Agreement Before Submitting')}</p>
+              <p className="text-xs text-amber-700 mt-0.5">{L('Baada ya kuwasilisha, Ofisi itakagua na kutoa nakala kwa pande zote mbili.', 'After submission, the Office will review and issue copies to both parties.')}</p>
+            </div>
+          </div>
+          <PSection icon={<Key size={14}/>} title={L('Mpangishaji', 'Landlord')} stepKey="landlord">
+            <PRow label={L('Jina', 'Name')} value={`${userProfile?.first_name} ${userProfile?.last_name}`}/>
+            <PRow label="NIDA" value={userProfile?.nida_number}/>
+            <PRow label={L('Simu', 'Phone')} value={userProfile?.phone}/>
+          </PSection>
+          <PSection icon={<UserCheck size={14}/>} title={L('Mpangaji', 'Tenant')} stepKey="tenant">
+            <PRow label={L('Jina', 'Name')} value={`${tenantFound?.first_name} ${tenantFound?.last_name}`}/>
+            <PRow label="NIDA" value={tenantFound?.nida_number}/>
+            <PRow label={L('Simu', 'Phone')} value={tenantFound?.phone}/>
+          </PSection>
+          <PSection icon={<Home size={14}/>} title={L('Nyumba', 'Property')} stepKey="property">
+            <PRow label={L('Aina', 'Type')} value={PROPERTY_TYPES.find(p => p.value === vals.property_type)?.label}/>
+            <PRow label={L('Anwani', 'Address')} value={vals.property_address}/>
+            {vals.num_rooms && <PRow label={L('Vyumba', 'Rooms')} value={vals.num_rooms}/>}
+            <PRow label={L('Kodi ya Mwezi', 'Monthly Rent')} value={monthlyRent > 0 ? fmtTsh(monthlyRent) : '—'}/>
+            <PRow label={L('Amana', 'Deposit')} value={deposit > 0 ? fmtTsh(deposit) : '—'}/>
+            <PRow label={L('Tarehe ya Kuanza', 'Start Date')} value={vals.lease_start}/>
+            <PRow label={L('Muda wa Mkataba', 'Lease Duration')} value={LEASE_DURATION.find(l => l.value === vals.lease_duration)?.label}/>
+            <PRow label={L('Taarifa ya Kutoka', 'Notice Period')} value={NOTICE_PERIODS.find(n => n.value === vals.notice_period)?.label}/>
+            {vals.included_utilities.length > 0 && <PRow label={L('Huduma Zilizojumuishwa', 'Included Utilities')} value={vals.included_utilities.map(u => UTILITIES_OPTIONS.find(o => o.key === u)?.icon).join(' ')}/>}
+          </PSection>
+          <PSection icon={<Users size={14}/>} title={L('Mashahidi', 'Witnesses')} stepKey="terms">
+            <PRow label={L('Shahidi 1', 'Witness 1')} value={`${vals.witness1_name} · ${vals.witness1_phone}`}/>
+            <PRow label={L('Shahidi 2', 'Witness 2')} value={`${vals.witness2_name} · ${vals.witness2_phone}`}/>
+            {vals.house_rules && <><p className="col-span-2 text-xs text-stone-500">{L('Kanuni za Nyumba', 'House Rules')}</p><p className="col-span-2 text-xs font-bold text-stone-800">{vals.house_rules}</p></>}
+          </PSection>
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex justify-between items-center">
+            <div>
+              <span className="font-bold text-teal-800 text-sm">{L('Ada ya Huduma:', 'Service Fee:')}</span>
+              <p className="text-xs text-teal-600">{L('Kodi 1 mwezi au TSh 10,000 — kilicho kikubwa', '1 month rent or TSh 10,000 — whichever is greater')}</p>
+            </div>
+            <span className="text-xl font-black text-teal-700">{fmtTsh(serviceFee)}</span>
+          </div>
+          <div className="space-y-3">
+            <p className="text-xs font-black text-stone-600 uppercase tracking-wider">{L('IDHINI NA UTHIBITISHO', 'CONSENT & CONFIRMATION')}</p>
+            {[
+              { key: 'landlord_confirmed' as const, sw: 'Mimi (Mpangishaji) nathibitisha kwamba mimi ndiye mmiliki halali wa mali hii na nina haki ya kuipangisha.', en: 'I (Landlord) confirm that I am the rightful owner of this property and have the right to rent it out.' },
+              { key: 'terms_accepted' as const, sw: 'Nathibitisha kwamba taarifa zote ni za kweli na ninakubaliana na masharti ya Serikali ya Mtaa kuhusiana na makubaliano haya ya pango.', en: 'I confirm all information is accurate and agree to the Local Government terms for this rental agreement.' },
+            ].map(item => (
+              <label key={item.key} className={`flex items-start gap-3 cursor-pointer rounded-xl p-3 border transition-colors ${vals[item.key] ? 'bg-teal-50 border-teal-300' : 'bg-stone-50 border-stone-200 hover:bg-teal-50/50'}`}>
+                <input type="checkbox" checked={vals[item.key]} onChange={e => { set(item.key, e.target.checked); clrErr(item.key); }} className="w-4 h-4 mt-0.5 rounded shrink-0"/>
+                <span className="text-xs text-stone-700 font-medium leading-relaxed">{lang === 'sw' ? item.sw : item.en}</span>
+              </label>
+            ))}
+            {(errors.landlord_confirmed || errors.terms_accepted) && <p className="text-red-500 text-xs flex items-center gap-1"><AlertCircle size={11}/>{errors.landlord_confirmed || errors.terms_accepted}</p>}
+          </div>
+        </div>
+      );
+      default: return null;
+    }
   };
 
-  if (showReview) {
-    return (
-      <form className="space-y-6">
-        <ReviewSection />
-      </form>
-    );
-  }
-
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
-      <ProgressBar />
-
-      {/* Step 1: Property Type */}
-      {currentStep === 'property' && (
-        <div className="space-y-6">
-          <div className={sectionClass}>
-            <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-              <Building className="h-5 w-5" />
-              {lang === 'sw' ? 'TAARIFA ZA NYUMBA' : 'PROPERTY DETAILS'}
-            </h3>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Aina ya Nyumba/Pango' : 'Property Type'} <span className="text-red-500">*</span>
-            </label>
-            <select {...register('property_type', { required: true })} className={inputClass}>
-              <option value="">{t.selectOption}</option>
-              {PROPERTY_TYPES.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            {errors.property_type && <span className="text-red-500 text-sm">{t.required}</span>}
-          </div>
-
-          {propertyType === 'LIVING' && (
-            <>
-              <div>
-                <label className={labelClass}>
-                  {lang === 'sw' ? 'Je ni nyumba nzima au chumba?' : 'Full house or rooms?'}
-                </label>
-                <select {...register('living_space_type')} className={inputClass}>
-                  <option value="">{t.selectOption}</option>
-                  {LIVING_SPACE_TYPES.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className={labelClass}>
-                  {lang === 'sw' ? 'Aina ya Nyumba' : 'House Type'}
-                </label>
-                <select {...register('house_type')} className={inputClass}>
-                  <option value="">{t.selectOption}</option>
-                  {HOUSE_TYPES.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {livingSpaceType === 'ROOM' && (
-                <div>
-                  <label className={labelClass}>
-                    {lang === 'sw' ? 'Idadi ya Vyumba' : 'Number of Rooms'}
-                  </label>
-                  <input 
-                    type="number" 
-                    {...register('room_count', { min: 1 })} 
-                    className={inputClass}
-                    min="1"
-                  />
-                </div>
-              )}
-            </>
+    <div className="space-y-6">
+      {!submitted && <ProgressBar/>}
+      <div className="min-h-[280px]">{renderStep()}</div>
+      {!submitted && (
+        <div className="flex gap-3 pt-4 border-t border-stone-100">
+          {stepIdx > 0 && (
+            <button type="button" onClick={goPrev} className="flex-1 py-3.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm">
+              <ArrowLeft size={17}/> {L('Nyuma', 'Previous')}
+            </button>
           )}
-
-          {/* Property Features Quick Selection */}
-          <div className="space-y-3">
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Vipengele vya Nyumba (Bofya kuchagua)' : 'Property Features (Click to select)'}
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {PROPERTY_FEATURES.map(feature => {
-                let Icon = CheckSquare;
-                if (feature.icon === 'bed') Icon = Bed;
-                else if (feature.icon === 'bath') Icon = Bath;
-                else if (feature.icon === 'wifi') Icon = Wifi;
-                else if (feature.icon === 'zap') Icon = Zap;
-                else if (feature.icon === 'droplet') Icon = Droplet;
-                else if (feature.icon === 'shield') Icon = ShieldIcon;
-                else if (feature.icon === 'home') Icon = Home;
-                
-                return (
-                  <button
-                    key={feature.value}
-                    type="button"
-                    onClick={() => toggleFeature(feature.value)}
-                    className={`p-2 text-xs rounded-lg border transition-all flex items-center gap-1 ${
-                      selectedFeatures.includes(feature.value)
-                        ? 'bg-emerald-100 border-emerald-500 text-emerald-700'
-                        : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    <Icon className={`h-3 w-3 ${
-                      selectedFeatures.includes(feature.value) ? 'text-emerald-600' : 'text-stone-400'
-                    }`} />
-                    {feature.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Maelezo ya Ziada (Hiari)' : 'Additional Description (Optional)'}
-            </label>
-            <textarea 
-              value={customDescription}
-              onChange={(e) => setCustomDescription(e.target.value)}
-              className={inputClass}
-              rows={3}
-              placeholder={lang === 'sw' ? 'Mfano: Vyumba 3, Sebule, Jiko, Bafu...' : 'e.g., 3 bedrooms, living room, kitchen, bathroom...'}
-            />
-          </div>
-
-          {/* Hidden field for house_description */}
-          <input 
-            type="hidden" 
-            {...register('house_description')} 
-          />
-        </div>
-      )}
-
-      {/* Step 2: Location */}
-      {currentStep === 'location' && (
-        <div className="space-y-6">
-          <div className={sectionClass}>
-            <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              {lang === 'sw' ? 'MAHALI HALISI ILIPO NYUMBA' : 'EXACT LOCATION'}
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Mkoa' : 'Region'} <span className="text-red-500">*</span>
-              </label>
-              <select 
-                {...register('region', { required: true })}
-                className={inputClass}
-                value={selectedRegion}
-                onChange={(e) => {
-                  setSelectedRegion(e.target.value);
-                  setSelectedDistrict('');
-                  setSelectedWard('');
-                  setValue('region', e.target.value);
-                  setValue('district', '');
-                  setValue('ward', '');
-                }}
-              >
-                <option value="">{lang === 'sw' ? 'Chagua Mkoa' : 'Select Region'}</option>
-                {TANZANIA_REGIONS.map(region => (
-                  <option key={region.value} value={region.value}>{region.label}</option>
-                ))}
-              </select>
-              {errors.region && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Wilaya' : 'District'} <span className="text-red-500">*</span>
-              </label>
-              <select 
-                {...register('district', { required: true })}
-                className={inputClass}
-                value={selectedDistrict}
-                onChange={(e) => {
-                  setSelectedDistrict(e.target.value);
-                  setSelectedWard('');
-                  setValue('district', e.target.value);
-                  setValue('ward', '');
-                }}
-                disabled={!selectedRegion}
-              >
-                <option value="">{lang === 'sw' ? 'Chagua Wilaya' : 'Select District'}</option>
-                {availableDistricts.map(district => (
-                  <option key={district.value} value={district.value}>{district.label}</option>
-                ))}
-              </select>
-              {errors.district && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Kata' : 'Ward'} <span className="text-red-500">*</span>
-              </label>
-              <select 
-                {...register('ward', { required: true })}
-                className={inputClass}
-                value={selectedWard}
-                onChange={(e) => {
-                  setSelectedWard(e.target.value);
-                  setValue('ward', e.target.value);
-                }}
-                disabled={!selectedDistrict}
-              >
-                <option value="">{lang === 'sw' ? 'Chagua Kata' : 'Select Ward'}</option>
-                {availableWards.map(ward => (
-                  <option key={ward.value} value={ward.value}>{ward.label}</option>
-                ))}
-              </select>
-              {errors.ward && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Mtaa / Kitongoji' : 'Street'} <span className="text-red-500">*</span>
-              </label>
-              <input {...register('street', { required: true })} className={inputClass} />
-              {errors.street && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Namba ya Nyumba / Plot' : 'House/Plot Number'} <span className="text-red-500">*</span>
-              </label>
-              <input {...register('house_number', { required: true })} className={inputClass} />
-              {errors.house_number && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'GPS Coordinates (Hiari)' : 'GPS Coordinates (Optional)'}
-              </label>
-              <input 
-                {...register('gps_coordinates')} 
-                className={inputClass}
-                placeholder="-6.7924, 39.2083"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Rent Calculation */}
-      {currentStep === 'rent' && (
-        <div className="space-y-6">
-          <div className={sectionClass}>
-            <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-              <Calculator className="h-5 w-5" />
-              {lang === 'sw' ? 'HESABU ZA KODI' : 'RENT CALCULATIONS'}
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Kodi ya Mwezi (TZS)' : 'Monthly Rent (TZS)'} <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-                <input 
-                  type="number" 
-                  {...register('monthly_rent', { required: true, min: 0 })} 
-                  className={`${inputClass} pl-10`}
-                  placeholder="0"
-                />
-              </div>
-              {errors.monthly_rent && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Muda wa Malipo (Miezi)' : 'Payment Period (Months)'} <span className="text-red-500">*</span>
-              </label>
-              <input 
-                type="number" 
-                {...register('payment_period', { required: true, min: 1 })} 
-                className={inputClass}
-                min="1"
-              />
-              {errors.payment_period && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-          </div>
-
-          {/* Live Fee Calculation */}
-          {monthlyRent > 0 && (
-            <div className="bg-linear-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
-              <h4 className="font-bold text-emerald-800 mb-3 flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                {lang === 'sw' ? 'Muhtasari wa Malipo' : 'Payment Summary'}
-              </h4>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-stone-600">{lang === 'sw' ? 'Kodi ya Mwezi:' : 'Monthly Rent:'}</span>
-                  <span className="font-medium">{feeBreakdown.monthlyRent.toLocaleString()} TZS</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-stone-600">{lang === 'sw' ? 'Miezi:' : 'Months:'}</span>
-                  <span className="font-medium">{feeBreakdown.paymentPeriod}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-stone-600">{lang === 'sw' ? 'Jumla ya Kodi:' : 'Total Rent:'}</span>
-                  <span className="font-medium">{feeBreakdown.totalRent.toLocaleString()} TZS</span>
-                </div>
-                <div className="border-t border-emerald-200 my-2"></div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-emerald-600">VAT (18%):</span>
-                  <span className="font-medium text-emerald-600">{feeBreakdown.vatAmount.toLocaleString()} TZS</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-emerald-600">{lang === 'sw' ? 'Ada ya Huduma (3%):' : 'Service Fee (3%):'}</span>
-                  <span className="font-medium text-emerald-600">{feeBreakdown.serviceFee.toLocaleString()} TZS</span>
-                </div>
-                <div className="border-t border-emerald-200 my-2"></div>
-                <div className="flex justify-between font-bold text-lg">
-                  <span className="text-emerald-800">{lang === 'sw' ? 'JUMLA KUU:' : 'GRAND TOTAL:'}</span>
-                  <span className="text-emerald-600">{feeBreakdown.grandTotal.toLocaleString()} TZS</span>
-                </div>
-              </div>
-            </div>
+          {step !== 'preview' ? (
+            <button type="button" onClick={goNext} className="flex-1 py-3.5 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 text-sm">
+              {step === 'terms' ? <><Eye size={17}/> {L('Hakiki Makubaliano', 'Preview Agreement')}</> : <>{L('Endelea', 'Continue')} <ArrowRight size={17}/></>}
+            </button>
+          ) : (
+            <button type="button" onClick={handleSubmit} disabled={submitting || isLoading}
+              className="flex-1 py-3.5 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed">
+              {submitting || isLoading ? <><Loader2 size={17} className="animate-spin"/> {L('Inawasilisha...', 'Submitting...')}</> : <><FileCheck size={17}/> {L('Thibitisha na Wasilisha', 'Confirm & Submit')}</>}
+            </button>
           )}
         </div>
       )}
-
-      {/* Step 4: Landlord Information */}
-      {currentStep === 'landlord' && (
-        <div className="space-y-6">
-          <div className={sectionClass}>
-            <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-              <Key className="h-5 w-5" />
-              {lang === 'sw' ? 'TAARIFA ZA MWENYE NYUMBA' : 'LANDLORD INFORMATION'}
-            </h3>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Mwenye nyumba ni Owner au Msimamizi?' : 'Owner or Manager?'} <span className="text-red-500">*</span>
-            </label>
-            <select {...register('landlord_role', { required: true })} className={inputClass}>
-              <option value="">{t.selectOption}</option>
-              {LANDLORD_ROLES.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            {errors.landlord_role && <span className="text-red-500 text-sm">{t.required}</span>}
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Jina Kamili' : 'Full Name'} <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-              <input 
-                {...register('landlord_name', { required: true })} 
-                className={`${inputClass} pl-10`}
-              />
-            </div>
-            {errors.landlord_name && <span className="text-red-500 text-sm">{t.required}</span>}
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Namba ya NIDA' : 'NIDA Number'} <span className="text-red-500">*</span>
-            </label>
-            <input 
-              {...register('landlord_nida', { required: true })} 
-              className={inputClass}
-              placeholder="XXXXXXXXXXXXXXXXXX"
-            />
-            {errors.landlord_nida && <span className="text-red-500 text-sm">{t.required}</span>}
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Namba ya Simu' : 'Phone Number'} <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-              <input 
-                type="tel"
-                {...register('landlord_phone', { required: true })} 
-                className={`${inputClass} pl-10`}
-                placeholder="+255 7XX XXX XXX"
-              />
-            </div>
-            {errors.landlord_phone && <span className="text-red-500 text-sm">{t.required}</span>}
-          </div>
-        </div>
-      )}
-
-      {/* Step 5: Tenant Information */}
-      {currentStep === 'tenant' && (
-        <div className="space-y-6">
-          <div className={sectionClass}>
-            <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              {lang === 'sw' ? 'TAARIFA ZA MPANGAJI' : 'TENANT INFORMATION'}
-            </h3>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Je, mpangaji ni wewe mwenyewe?' : 'Are you the tenant?'}
-            </label>
-            <select {...register('tenant_is_self')} className={inputClass}>
-              <option value="SELF">{lang === 'sw' ? 'Ndiyo - Mimi ndiye mpangaji' : 'Yes - I am the tenant'}</option>
-              <option value="OTHER">{lang === 'sw' ? 'Hapana - Mpangaji ni mtu mwingine' : 'No - Another person is the tenant'}</option>
-            </select>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Jina Kamili la Mpangaji' : 'Tenant Full Name'} <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-              <input 
-                {...register('tenant_name', { required: true })} 
-                className={`${inputClass} pl-10`}
-                defaultValue={tenantIsSelf === 'SELF' && userProfile ? `${userProfile.first_name} ${userProfile.middle_name || ''} ${userProfile.last_name}`.trim() : ''}
-              />
-            </div>
-            {errors.tenant_name && <span className="text-red-500 text-sm">{t.required}</span>}
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Namba ya NIDA ya Mpangaji' : 'Tenant NIDA Number'} <span className="text-red-500">*</span>
-            </label>
-            <input 
-              {...register('tenant_nida', { required: true })} 
-              className={inputClass}
-              placeholder="XXXXXXXXXXXXXXXXXX"
-              defaultValue={tenantIsSelf === 'SELF' && userProfile ? userProfile.nida_number || '' : ''}
-            />
-            {errors.tenant_nida && <span className="text-red-500 text-sm">{t.required}</span>}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Hali ya Ndoa' : 'Marital Status'} <span className="text-red-500">*</span>
-              </label>
-              <select {...register('tenant_marital_status', { required: true })} className={inputClass}>
-                <option value="">{t.selectOption}</option>
-                {MARITAL_STATUS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              {errors.tenant_marital_status && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Aina ya Kazi' : 'Occupation'} <span className="text-red-500">*</span>
-              </label>
-              <select {...register('tenant_occupation', { required: true })} className={inputClass}>
-                <option value="">{t.selectOption}</option>
-                {OCCUPATION_TYPES.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              {errors.tenant_occupation && <span className="text-red-500 text-sm">{t.required}</span>}
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Mpangaji anaishi peke yake au na familia?' : 'Living alone or with family?'} <span className="text-red-500">*</span>
-            </label>
-            <select {...register('tenant_living_arrangement', { required: true })} className={inputClass}>
-              <option value="">{t.selectOption}</option>
-              {LIVING_ARRANGEMENTS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            {errors.tenant_living_arrangement && <span className="text-red-500 text-sm">{t.required}</span>}
-          </div>
-
-          {tenantLivingArrangement === 'FAMILY' && (
-            <div>
-              <label className={labelClass}>
-                {lang === 'sw' ? 'Idadi ya wanafamilia watakaoishi hapa' : 'Number of family members'}
-              </label>
-              <input 
-                type="number" 
-                {...register('family_member_count', { min: 1 })} 
-                className={inputClass}
-                min="1"
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Step 6: Terms & Approval */}
-      {currentStep === 'terms' && (
-        <div className="space-y-6">
-          <div className={sectionClass}>
-            <h3 className="font-bold text-emerald-800 flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              {lang === 'sw' ? 'MAKUBALIANO NA SERA' : 'TERMS AND CONDITIONS'}
-            </h3>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Vigezo na Masharti' : 'Terms and Conditions'} <span className="text-red-500">*</span>
-            </label>
-            <textarea 
-              {...register('agreement_terms', { required: true })} 
-              className={inputClass}
-              rows={5}
-              placeholder={lang === 'sw' 
-                ? 'Andika masharti ya pango (muda wa kutoa taarifa, upangaji wa matengenezo, n.k.)' 
-                : 'Write rent terms (notice period, maintenance arrangements, etc.)'}
-            />
-            {errors.agreement_terms && <span className="text-red-500 text-sm">{t.required}</span>}
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Wewe ni nani katika mkataba huu?' : 'Who are you in this agreement?'} <span className="text-red-500">*</span>
-            </label>
-            <select {...register('submitter_role', { required: true })} className={inputClass}>
-              <option value="">{t.selectOption}</option>
-              {SUBMITTER_ROLES.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            {errors.submitter_role && <span className="text-red-500 text-sm">{t.required}</span>}
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              {lang === 'sw' ? 'Tuma kwa upande mwingine kuidhinisha?' : 'Send for approval?'}
-            </label>
-            <select {...register('send_for_approval')} className={inputClass}>
-              <option value="YES">{lang === 'sw' ? 'Ndiyo - Tuma kwa idhini' : 'Yes - Send for approval'}</option>
-              <option value="NO">{lang === 'sw' ? 'Hapana - Usitume' : 'No - Do not send'}</option>
-            </select>
-          </div>
-
-          {sendForApproval === 'YES' && (
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-stone-400" />
-                  <input
-                    type="text"
-                    value={targetCitizenId}
-                    onChange={(e) => setTargetCitizenId(e.target.value)}
-                    placeholder={lang === 'sw' ? 'NIDA ya upande mwingine' : 'Other party NIDA'}
-                    className={`${inputClass} pl-10`}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCitizenLookup}
-                  disabled={searching}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl font-semibold flex items-center gap-2 transition-all"
-                >
-                  {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
-                </button>
-              </div>
-
-              {lookupResult && (
-                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="h-5 w-5 text-emerald-600" />
-                    <span className="font-bold text-emerald-700">{lang === 'sw' ? 'Mtumiaji Amepatikana!' : 'User Found!'}</span>
-                  </div>
-                  <p className="font-medium text-stone-800">{lookupResult.full_name}</p>
-                  {lookupResult.phone && <p className="text-sm text-stone-600">{lookupResult.phone}</p>}
-                </div>
-              )}
-
-              {lookupError && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-                  <p className="text-sm text-red-700">{lookupError}</p>
-                </div>
-              )}
-
-              <div>
-                <label className={labelClass}>
-                  {lang === 'sw' ? 'Ujumbe kwa anayethibitisha (hiari)' : 'Message to approver (optional)'}
-                </label>
-                <textarea 
-                  {...register('approval_note')} 
-                  className={inputClass}
-                  rows={2}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Terms Acceptance */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input 
-                type="checkbox" 
-                {...register('agreement_accepted', { required: true })} 
-                className="w-5 h-5 mt-0.5 text-emerald-600 rounded focus:ring-emerald-500"
-              />
-              <div>
-                <span className="font-medium text-emerald-800">
-                  {lang === 'sw' 
-                    ? 'Nimekubali vigezo na masharti ya pango' 
-                    : 'I accept the terms and conditions of this rent agreement'}
-                </span>
-                <p className="text-xs text-emerald-600 mt-1">
-                  {lang === 'sw' 
-                    ? 'Kwa kukubali, unathibitisha kuwa taarifa ulizotoa ni sahihi na unaelewa kuwa makubaliano haya yatakuwa na nguvu ya kisheria.'
-                    : 'By accepting, you confirm that the information provided is correct and that this agreement will be legally binding.'}
-                </p>
-              </div>
-            </label>
-            {errors.agreement_accepted && (
-              <span className="text-red-500 text-sm block mt-2">
-                {lang === 'sw' ? 'Lazima ukubali masharti ili kuendelea' : 'You must accept the terms to continue'}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Navigation Buttons */}
-      <div className="flex gap-3 pt-6 border-t border-stone-200">
-        {currentStepIndex > 0 && (
-          <button
-            type="button"
-            onClick={handlePrevious}
-            className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            {lang === 'sw' ? 'Nyuma' : 'Previous'}
-          </button>
-        )}
-        
-        {currentStep !== 'review' && (
-          <button
-            type="button"
-            onClick={handleNext}
-            className={`flex-1 py-3 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 ${
-              currentStepIndex === 0 ? 'w-full' : ''
-            }`}
-          >
-            {currentStep === 'terms' ? (
-              <>
-                {lang === 'sw' ? 'Hakiki Mkataba' : 'Review Agreement'}
-                <Eye className="h-5 w-5" />
-              </>
-            ) : (
-              <>
-                {lang === 'sw' ? 'Endelea' : 'Continue'}
-                <ArrowRight className="h-5 w-5" />
-              </>
-            )}
-          </button>
-        )}
-      </div>
-    </form>
+    </div>
   );
 };
 
