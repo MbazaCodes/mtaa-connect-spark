@@ -276,3 +276,28 @@
   );
   background-size: 1000px 100%;
 }
+/* ── Mobile responsiveness utilities ─────────────────────────────────── */
+
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Prevent horizontal overflow on small screens */
+@media (max-width: 640px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ensure modal dialogs don't overflow viewport */
+  .modal-content {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}

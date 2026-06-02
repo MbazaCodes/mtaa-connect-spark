@@ -485,12 +485,12 @@ export function AdminDashboard({ setView }: { setView?: (view: string) => void }
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8"
+      className="space-y-4 sm:space-y-8"
     >
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-stone-900 tracking-tight">
+          <h1 className="text-xl sm:text-3xl font-black text-stone-900 tracking-tight">
             {lang === 'sw' ? 'Dashibodi ya Msimamizi' : 'Admin Dashboard'}
           </h1>
           <p className="text-stone-500 font-medium">

@@ -1068,8 +1068,8 @@ export function Profile() {
 
   // Render tabs
   const renderTabs = () => (
-    <div className="border-b border-stone-200 mb-6">
-      <div className="flex flex-wrap gap-2">
+    <div className="border-b border-stone-200 mb-4 sm:mb-6">
+      <div className="flex gap-1 overflow-x-auto scrollbar-none pb-px -mb-px">
         {[
           { id: 'personal', label: lang === 'sw' ? 'Binafsi' : 'Personal', icon: User },
           { id: 'identity', label: lang === 'sw' ? 'Utambulisho' : 'Identity', icon: CreditCard },
@@ -1083,13 +1083,13 @@ export function Profile() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 font-medium text-sm rounded-t-lg transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 font-medium text-xs sm:text-sm whitespace-nowrap rounded-t-lg transition-all flex-shrink-0 border-b-2 ${
               activeTab === tab.id
-                ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-500'
-                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-500'
+                : 'text-stone-500 hover:text-stone-900 hover:bg-stone-50 border-transparent'
             }`}
           >
-            <tab.icon size={16} />
+            <tab.icon size={14} />
             {tab.label}
           </button>
         ))}
@@ -1117,7 +1117,7 @@ export function Profile() {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="max-w-6xl mx-auto space-y-8"
+      className="max-w-6xl mx-auto space-y-4 sm:space-y-8"
     >
       {/* Header with refresh */}
       <div className="flex items-center justify-between">
@@ -1141,7 +1141,7 @@ export function Profile() {
       {/* Main profile card */}
       <div className="bg-white rounded-4xl border border-stone-100 shadow-xl overflow-hidden">
         {/* Profile header */}
-        <div className="bg-linear-to-br from-emerald-600 to-emerald-700 p-8 md:p-12 text-white relative overflow-hidden">
+        <div className="bg-linear-to-br from-emerald-600 to-emerald-700 p-5 sm:p-8 md:p-12 text-white relative overflow-hidden">
           <div className="absolute inset-0 bg-black/10" />
           <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
             <div className="relative group">
@@ -1264,7 +1264,7 @@ export function Profile() {
         {renderTabs()}
 
         {/* Tab content */}
-        <div className="p-8">
+        <div className="p-4 sm:p-8">
           {/* Personal Information Tab */}
           {activeTab === 'personal' && (
             <motion.div
@@ -2703,7 +2703,7 @@ export function Profile() {
         </div>
 
         {/* Action buttons */}
-        <div className="border-t border-stone-100 p-8">
+        <div className="border-t border-stone-100 p-4 sm:p-8">
           <div className="flex flex-col sm:flex-row gap-4">
             {isEditing ? (
               <>

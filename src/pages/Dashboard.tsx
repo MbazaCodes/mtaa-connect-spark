@@ -157,13 +157,13 @@ export function Dashboard({ applications, setView, onRefresh }: DashboardProps) 
       </div>
 
       <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 flex items-center justify-between">
           <h2 className="font-bold text-stone-800">{lang === 'sw' ? 'Maombi ya Karibuni' : 'Recent Applications'}</h2>
           <button onClick={() => setView('applications')} className="text-sm text-emerald-600 font-semibold hover:underline">{lang === 'sw' ? 'Tazama Yote' : 'View All'}</button>
         </div>
         <div className="divide-y divide-stone-100">
           {applications.slice(0, 5).map(app => (
-            <div key={app.id} className="px-6 py-4 flex items-center justify-between hover:bg-stone-50 transition-colors">
+            <div key={app.id} className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between hover:bg-stone-50 transition-colors">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-500">
                   <FileText size={20} />
@@ -177,7 +177,7 @@ export function Dashboard({ applications, setView, onRefresh }: DashboardProps) 
             </div>
           ))}
           {applications.length === 0 && (
-            <div className="px-6 py-12 text-center text-stone-400">
+            <div className="px-4 sm:px-6 py-8 sm:py-12 text-center text-stone-400">
               {lang === 'sw' ? 'Hakuna maombi yaliyopatikana.' : 'No applications found.'}
             </div>
           )}

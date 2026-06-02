@@ -321,27 +321,27 @@ export function Applications({ applications, drafts = [], onPay, onRefresh, onRe
           <table className="w-full text-left border-collapse">
             <thead className="bg-stone-50 border-b border-stone-200">
               <tr>
-                <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">{t('services')}</th>
-                <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">{lang === 'sw' ? 'Namba ya Maombi' : 'App Number'}</th>
-                <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">{t('date')}</th>
-                <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">{t('status')}</th>
-                <th className="px-6 py-4 text-xs font-bold text-stone-500 uppercase tracking-wider text-right">{t('action')}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">{t('services')}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">{lang === 'sw' ? 'Namba ya Maombi' : 'App Number'}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">{t('date')}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs font-bold text-stone-500 uppercase tracking-wider">{t('status')}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs font-bold text-stone-500 uppercase tracking-wider text-right">{t('action')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
               {displayApplications.map(app => (
                 <tr key={app.id} className="hover:bg-stone-50 transition-colors cursor-pointer" onClick={() => setSelectedApp(app)}>
-                  <td className="px-6 py-4">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4">
                     <p className="font-semibold text-stone-800">{lang === 'sw' ? (app as any).services?.name : (app as any).services?.name_en || (app as any).services?.name}</p>
                   </td>
-                  <td className="px-6 py-4 text-sm text-stone-500 font-mono">{app.application_number}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-stone-500 font-mono">{app.application_number}</td>
+                  <td className="px-3 sm:px-6 py-3 sm:py-4">
                     <div className="flex flex-col">
                       <p className="text-sm text-stone-600">{new Date(app.created_at).toLocaleDateString()}</p>
                       <p className="text-xs text-stone-400">{new Date(app.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4">
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
                         <StatusBadge status={app.status} lang={lang} />
@@ -358,7 +358,7 @@ export function Applications({ applications, drafts = [], onPay, onRefresh, onRe
                       <ApplicationProgressBar status={app.status} lang={lang} compact />
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
                     {(app.status === 'submitted' || app.status === 'pending_payment') && getPaymentAmount(app) > 0 ? (
                       <button onClick={(e) => { e.stopPropagation(); onPay(app); }}
                         className="bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all">

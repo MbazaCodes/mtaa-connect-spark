@@ -34,14 +34,16 @@ export function Header({ onMenuClick }: HeaderProps) {
             referrerPolicy="no-referrer"
           />
           <div className="h-8 sm:h-10 w-px bg-stone-200 hidden xs:block" aria-hidden="true"></div>
-          <div className="flex flex-col leading-none">
-            <span className="text-base sm:text-lg font-black tracking-tighter text-stone-900 flex items-center gap-1">
+          <div className="flex flex-col">
+            <span className="text-lg sm:text-xl font-black tracking-tighter text-stone-900 flex items-center gap-1">
               E-MTAA
-              <span className="text-[7px] sm:text-[9px] text-white px-1 py-0.5 rounded font-bold tracking-normal align-middle bg-primary ml-1">
+              <span
+                className="text-[8px] sm:text-[10px] text-white px-1 sm:px-1.5 py-0.5 rounded font-bold tracking-normal align-middle bg-primary"
+              >
                 PORTAL
               </span>
             </span>
-            <span className="text-[7px] sm:text-[9px] font-bold text-stone-500 uppercase tracking-widest leading-none hidden sm:block">
+            <span className="text-[8px] sm:text-[10px] font-bold text-stone-500 uppercase tracking-widest leading-none hidden xs:block">
               {TanzanianBranding.text.office}
             </span>
           </div>

@@ -54,7 +54,7 @@ export function Apply({ selectedService, onBack, onSubmit, draft }: ApplyProps) 
       </button>
       
       {/* Official Form Header */}
-      <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm text-center relative overflow-hidden">
+      <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-stone-200 shadow-sm text-center relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1.5 bg-emerald-600" />
         <img 
           src={TANZANIA_LOGO_URL} 
@@ -84,7 +84,7 @@ export function Apply({ selectedService, onBack, onSubmit, draft }: ApplyProps) 
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm">
+      <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-stone-200 shadow-sm">
         <div className="mb-8">
           <h3 className="text-lg font-bold text-stone-800">{lang === 'sw' ? 'Taarifa za Maombi' : 'Application Details'}</h3>
           <p className="text-sm text-stone-500 mt-1">{lang === 'sw' ? 'Tafadhali jaza maelezo yote yanayohitajika kwa usahihi.' : 'Please fill in all required details accurately.'}</p>

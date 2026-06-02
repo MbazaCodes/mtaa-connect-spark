@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
   Search, 
+  Filter, 
   MoreVertical, 
   Mail, 
   Phone, 
@@ -20,15 +21,7 @@ import {
   Edit2,
   Trash2,
   CreditCard,
-  RefreshCw,
-  Briefcase,
-  BookOpen,
-  Heart,
-  Navigation,
-  Map,
-  Flag,
-  Fingerprint,
-  Hash
+  RefreshCw
 } from 'lucide-react';
 import { supabase, UserProfile } from '@/lib/supabase';
 import { IS_SUPABASE_CONFIGURED } from '@/lib/config';
@@ -270,8 +263,7 @@ export function CitizenManagement() {
     }
   };
 
-  const handleCitizenClick = async (citizen: UserProfile) => {
-    // Show modal immediately with list data, then refresh with full DB record
+  const handleCitizenClick = (citizen: UserProfile) => {
     setSelectedCitizen(citizen);
     setEditFormData({
       first_name: citizen.first_name || '',
@@ -283,28 +275,6 @@ export function CitizenManagement() {
     });
     setEditingInfo(false);
     setShowDetailsModal(true);
-
-    // Re-fetch full profile to ensure all signup fields are present
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', citizen.id)
-        .maybeSingle();
-      if (!error && data) {
-        setSelectedCitizen(data as UserProfile);
-        setEditFormData({
-          first_name: data.first_name || '',
-          middle_name: data.middle_name || '',
-          last_name: data.last_name || '',
-          phone: data.phone || '',
-          region: data.region || '',
-          district: data.district || ''
-        });
-      }
-    } catch (err) {
-      console.error('Error fetching full citizen profile:', err);
-    }
   };
 
   const handleUpdateInfo = async () => {
@@ -412,11 +382,11 @@ export function CitizenManagement() {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 sm:space-y-8"
+      className="space-y-8"
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-3xl font-black text-stone-900 tracking-tight">
+          <h1 className="text-3xl font-black text-stone-900 tracking-tight">
             {lang === 'sw' ? 'Usimamizi wa Wananchi' : 'Citizen Management'}
           </h1>
           <p className="text-stone-500 font-medium">
@@ -722,214 +692,113 @@ export function CitizenManagement() {
 
               {/* Content */}
               <div className="p-8 space-y-6">
-
-                {/* ── Row 1: CT ID & NIDA ── */}
+                {/* CT ID & NIDA Row */}
                 <div className="grid grid-cols-2 gap-4">
+                  {/* CT ID */}
                   <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
                     <div className="flex items-center gap-2 text-emerald-600 mb-1">
                       <CreditCard size={16} />
-                      <span className="text-xs font-bold uppercase tracking-wider">CT ID</span>
+                      <span className="text-xs font-bold uppercase tracking-wider">
+                        CT ID
+                      </span>
                     </div>
-                    <p className="font-bold text-emerald-800 text-lg font-mono">
+                    <p className="font-bold text-emerald-800 text-lg">
                       {selectedCitizen.citizen_id || (lang === 'sw' ? 'Haijatolewa' : 'Not assigned')}
                     </p>
                   </div>
+
+                  {/* NIDA Number */}
                   <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
                     <div className="flex items-center gap-2 text-amber-600 mb-1">
-                      <Fingerprint size={16} />
-                      <span className="text-xs font-bold uppercase tracking-wider">NIDA</span>
+                      <CreditCard size={16} />
+                      <span className="text-xs font-bold uppercase tracking-wider">
+                        NIDA
+                      </span>
                     </div>
-                    <p className="font-bold text-amber-800 text-lg font-mono break-all">
-                      {selectedCitizen.nida_number
-                        ? selectedCitizen.nida_number.replace(/-/g, '').match(/.{1,4}/g)?.join('-') || selectedCitizen.nida_number
-                        : (lang === 'sw' ? 'Haijasajiliwa' : 'Not registered')}
+                    <p className="font-bold text-amber-800 text-lg">
+                      {selectedCitizen.nida_number || (lang === 'sw' ? 'Haijasajiliwa' : 'Not registered')}
                     </p>
                   </div>
                 </div>
 
-                {/* ── Section: Personal Information ── */}
-                <div>
-                  <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-3">
-                    {lang === 'sw' ? 'Taarifa Binafsi' : 'Personal Information'}
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-stone-50 rounded-xl">
-                      <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                        <User size={12} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Jinsia' : 'Gender'}</span>
-                      </div>
-                      <p className="font-bold text-stone-800 text-sm">
-                        {selectedCitizen.gender === 'M' || selectedCitizen.gender === 'Me' || selectedCitizen.sex === 'M'
-                          ? (lang === 'sw' ? 'Mwanaume' : 'Male')
-                          : selectedCitizen.gender === 'F' || selectedCitizen.gender === 'Ke' || selectedCitizen.sex === 'F'
-                          ? (lang === 'sw' ? 'Mwanamke' : 'Female')
-                          : (lang === 'sw' ? 'Haijulikani' : 'Unknown')}
-                      </p>
+                {/* Citizen Info Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Phone */}
+                  <div className="p-4 bg-stone-50 rounded-2xl">
+                    <div className="flex items-center gap-2 text-stone-400 mb-1">
+                      <Phone size={14} />
+                      <span className="text-xs font-bold uppercase tracking-wider">
+                        {lang === 'sw' ? 'Simu' : 'Phone'}
+                      </span>
                     </div>
-
-                    <div className="p-3 bg-stone-50 rounded-xl">
-                      <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                        <Calendar size={12} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Tarehe ya Kuzaliwa' : 'Date of Birth'}</span>
-                      </div>
-                      <p className="font-bold text-stone-800 text-sm">
-                        {selectedCitizen.date_of_birth
-                          ? new Date(selectedCitizen.date_of_birth).toLocaleDateString(lang === 'sw' ? 'sw-TZ' : 'en-US')
-                          : (lang === 'sw' ? 'Haijatolewa' : 'Not provided')}
-                      </p>
-                    </div>
-
-                    <div className="p-3 bg-stone-50 rounded-xl">
-                      <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                        <Globe size={12} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Uraia' : 'Nationality'}</span>
-                      </div>
-                      <p className="font-bold text-stone-800 text-sm">
-                        {selectedCitizen.nationality || 'Tanzanian'}
-                      </p>
-                    </div>
-
-                    <div className="p-3 bg-stone-50 rounded-xl">
-                      <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                        <Heart size={12} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Hali ya Ndoa' : 'Marital Status'}</span>
-                      </div>
-                      <p className="font-bold text-stone-800 text-sm capitalize">
-                        {selectedCitizen.marital_status
-                          ? ({'single': lang === 'sw' ? 'Sijaoa' : 'Single', 'married': lang === 'sw' ? 'Ameoa' : 'Married', 'divorced': lang === 'sw' ? 'Ameachika' : 'Divorced', 'widowed': lang === 'sw' ? 'Mjane' : 'Widowed'}[selectedCitizen.marital_status] || selectedCitizen.marital_status)
-                          : (lang === 'sw' ? 'Haijatolewa' : 'Not provided')}
-                      </p>
-                    </div>
-
-                    <div className="p-3 bg-stone-50 rounded-xl">
-                      <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                        <Briefcase size={12} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Kazi' : 'Occupation'}</span>
-                      </div>
-                      <p className="font-bold text-stone-800 text-sm">
-                        {selectedCitizen.occupation || (lang === 'sw' ? 'Haijatolewa' : 'Not provided')}
-                      </p>
-                    </div>
-
-                    <div className="p-3 bg-stone-50 rounded-xl">
-                      <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                        <BookOpen size={12} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Elimu' : 'Education'}</span>
-                      </div>
-                      <p className="font-bold text-stone-800 text-sm capitalize">
-                        {selectedCitizen.education_level
-                          ? ({'none': lang === 'sw' ? 'Hakuna' : 'None', 'primary': lang === 'sw' ? 'Msingi' : 'Primary', 'secondary': lang === 'sw' ? 'Sekondari' : 'Secondary', 'diploma': 'Diploma', 'degree': lang === 'sw' ? 'Shahada' : 'Degree', 'masters': lang === 'sw' ? 'Uzamili' : 'Masters', 'phd': 'PhD'}[selectedCitizen.education_level] || selectedCitizen.education_level)
-                          : (lang === 'sw' ? 'Haijatolewa' : 'Not provided')}
-                      </p>
-                    </div>
-
-                    {selectedCitizen.place_of_birth && (
-                      <div className="p-3 bg-stone-50 rounded-xl">
-                        <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                          <Map size={12} />
-                          <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Mahali pa Kuzaliwa' : 'Place of Birth'}</span>
-                        </div>
-                        <p className="font-bold text-stone-800 text-sm">{selectedCitizen.place_of_birth}</p>
-                      </div>
-                    )}
-
-                    <div className="p-3 bg-stone-50 rounded-xl">
-                      <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                        <BadgeCheck size={12} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Uhakiki' : 'Verification'}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {selectedCitizen.is_verified ? (
-                          <><ShieldCheck size={14} className="text-emerald-500" /><span className="font-bold text-emerald-600 text-sm">{lang === 'sw' ? 'Imethibitishwa' : 'Verified'}</span></>
-                        ) : (
-                          <><ShieldAlert size={14} className="text-amber-500" /><span className="font-bold text-amber-600 text-sm">{lang === 'sw' ? 'Inasubiri' : 'Pending'}</span></>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Section: Contact ── */}
-                <div>
-                  <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-3">
-                    {lang === 'sw' ? 'Mawasiliano' : 'Contact'}
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-stone-50 rounded-xl">
-                      <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                        <Mail size={12} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Barua Pepe' : 'Email'}</span>
-                      </div>
-                      <p className="font-bold text-stone-800 text-sm break-all">{selectedCitizen.email}</p>
-                    </div>
-                    <div className="p-3 bg-stone-50 rounded-xl">
-                      <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                        <Phone size={12} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Simu' : 'Phone'}</span>
-                      </div>
-                      <p className="font-bold text-stone-800 text-sm">
-                        {selectedCitizen.phone || (lang === 'sw' ? 'Haijatolewa' : 'Not provided')}
-                      </p>
-                    </div>
-                    {selectedCitizen.alternative_phone && (
-                      <div className="p-3 bg-stone-50 rounded-xl">
-                        <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                          <Phone size={12} />
-                          <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Simu Mbadala' : 'Alt. Phone'}</span>
-                        </div>
-                        <p className="font-bold text-stone-800 text-sm">{selectedCitizen.alternative_phone}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── Section: Identity Documents ── */}
-                {(selectedCitizen.id_type || selectedCitizen.passport_number) && (
-                  <div>
-                    <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-3">
-                      {lang === 'sw' ? 'Vitambulisho' : 'Identity Documents'}
+                    <p className="font-bold text-stone-800">
+                      {selectedCitizen.phone || (lang === 'sw' ? 'Haijasajiliwa' : 'Not provided')}
                     </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {selectedCitizen.id_type && (
-                        <div className="p-3 bg-stone-50 rounded-xl">
-                          <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                            <CreditCard size={12} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Aina ya ID' : 'ID Type'}</span>
-                          </div>
-                          <p className="font-bold text-stone-800 text-sm capitalize">
-                            {({'birth_certificate': lang === 'sw' ? 'Cheti cha Kuzaliwa' : 'Birth Certificate', 'voter_id': lang === 'sw' ? 'Kadi ya Mpiga Kura' : 'Voter ID', 'driving_license': lang === 'sw' ? 'Leseni ya Udereva' : 'Driving License', 'zanzibar_id': lang === 'sw' ? 'ID ya Zanzibar' : 'Zanzibar ID', 'student_id': lang === 'sw' ? 'ID ya Mwanafunzi' : 'Student ID', 'employer_id': lang === 'sw' ? 'ID ya Kazi' : 'Employer ID'}[selectedCitizen.id_type] || selectedCitizen.id_type)}
-                          </p>
-                        </div>
-                      )}
-                      {selectedCitizen.id_number && (
-                        <div className="p-3 bg-stone-50 rounded-xl">
-                          <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                            <Hash size={12} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Namba ya ID' : 'ID Number'}</span>
-                          </div>
-                          <p className="font-bold text-stone-800 text-sm font-mono">{selectedCitizen.id_number}</p>
-                        </div>
-                      )}
-                      {selectedCitizen.passport_number && (
-                        <div className="p-3 bg-stone-50 rounded-xl">
-                          <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                            <Flag size={12} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Pasipoti' : 'Passport'}</span>
-                          </div>
-                          <p className="font-bold text-stone-800 text-sm font-mono">{selectedCitizen.passport_number}</p>
-                        </div>
+                  </div>
+
+                  {/* Gender */}
+                  <div className="p-4 bg-stone-50 rounded-2xl">
+                    <div className="flex items-center gap-2 text-stone-400 mb-1">
+                      <User size={14} />
+                      <span className="text-xs font-bold uppercase tracking-wider">
+                        {lang === 'sw' ? 'Jinsia' : 'Gender'}
+                      </span>
+                    </div>
+                    <p className="font-bold text-stone-800">
+                      {selectedCitizen.gender === 'M' ? (lang === 'sw' ? 'Me' : 'Male') :
+                       selectedCitizen.gender === 'F' ? (lang === 'sw' ? 'Ke' : 'Female') :
+                       (lang === 'sw' ? 'Haijulikani' : 'Unknown')}
+                    </p>
+                  </div>
+
+                  {/* Nationality */}
+                  <div className="p-4 bg-stone-50 rounded-2xl">
+                    <div className="flex items-center gap-2 text-stone-400 mb-1">
+                      <Globe size={14} />
+                      <span className="text-xs font-bold uppercase tracking-wider">
+                        {lang === 'sw' ? 'Uraia' : 'Nationality'}
+                      </span>
+                    </div>
+                    <p className="font-bold text-stone-800">
+                      {selectedCitizen.nationality || 'Tanzania'}
+                    </p>
+                  </div>
+
+                  {/* Verification Status */}
+                  <div className="p-4 bg-stone-50 rounded-2xl">
+                    <div className="flex items-center gap-2 text-stone-400 mb-1">
+                      <BadgeCheck size={14} />
+                      <span className="text-xs font-bold uppercase tracking-wider">
+                        {lang === 'sw' ? 'Uhakiki' : 'Verification'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {selectedCitizen.is_verified ? (
+                        <>
+                          <ShieldCheck size={16} className="text-emerald-500" />
+                          <span className="font-bold text-emerald-600">
+                            {lang === 'sw' ? 'Imethibitishwa' : 'Verified'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldAlert size={16} className="text-amber-500" />
+                          <span className="font-bold text-amber-600">
+                            {lang === 'sw' ? 'Inasubiri' : 'Pending'}
+                          </span>
+                        </>
                       )}
                     </div>
                   </div>
-                )}
+                </div>
 
-                {/* ── Section: Location (editable) ── */}
+                {/* Location Section */}
                 <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 text-emerald-600">
                       <MapPin size={16} />
                       <span className="text-xs font-bold uppercase tracking-wider">
-                        {lang === 'sw' ? 'Anwani' : 'Address'}
+                        {lang === 'sw' ? 'Mahali' : 'Location'}
                       </span>
                     </div>
                     {!editingInfo && (
@@ -943,113 +812,98 @@ export function CitizenManagement() {
                       </button>
                     )}
                   </div>
-
+                  
                   {editingInfo ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-3 gap-3">
-                        <input type="text" placeholder={lang === 'sw' ? 'Jina la kwanza' : 'First name'} value={editFormData.first_name}
+                        <input
+                          type="text"
+                          placeholder={lang === 'sw' ? 'Jina la kwanza' : 'First name'}
+                          value={editFormData.first_name}
                           onChange={(e) => setEditFormData({ ...editFormData, first_name: e.target.value })}
-                          className="h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none bg-white text-sm" />
-                        <input type="text" placeholder={lang === 'sw' ? 'Jina la kati' : 'Middle name'} value={editFormData.middle_name}
+                          className="h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none transition-all bg-white text-sm"
+                        />
+                        <input
+                          type="text"
+                          placeholder={lang === 'sw' ? 'Jina la kati' : 'Middle name'}
+                          value={editFormData.middle_name}
                           onChange={(e) => setEditFormData({ ...editFormData, middle_name: e.target.value })}
-                          className="h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none bg-white text-sm" />
-                        <input type="text" placeholder={lang === 'sw' ? 'Jina la mwisho' : 'Last name'} value={editFormData.last_name}
+                          className="h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none transition-all bg-white text-sm"
+                        />
+                        <input
+                          type="text"
+                          placeholder={lang === 'sw' ? 'Jina la mwisho' : 'Last name'}
+                          value={editFormData.last_name}
                           onChange={(e) => setEditFormData({ ...editFormData, last_name: e.target.value })}
-                          className="h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none bg-white text-sm" />
+                          className="h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none transition-all bg-white text-sm"
+                        />
                       </div>
-                      <input type="tel" placeholder={lang === 'sw' ? 'Simu' : 'Phone'} value={editFormData.phone}
+                      
+                      <input
+                        type="tel"
+                        placeholder={lang === 'sw' ? 'Simu' : 'Phone'}
+                        value={editFormData.phone}
                         onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                        className="w-full h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none bg-white text-sm" />
+                        className="w-full h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none transition-all bg-white text-sm"
+                      />
+                      
                       <div className="grid grid-cols-2 gap-3">
-                        <select title={lang === 'sw' ? 'Mkoa' : 'Region'} aria-label={lang === 'sw' ? 'Chagua mkoa' : 'Select region'}
+                        <select
+                          title={lang === 'sw' ? 'Chagua mkoa' : 'Select region'}
+                          aria-label={lang === 'sw' ? 'Chagua mkoa' : 'Select region'}
                           value={editFormData.region}
                           onChange={(e) => setEditFormData({ ...editFormData, region: e.target.value, district: '' })}
-                          className="h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none bg-white text-sm">
+                          className="h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none transition-all bg-white text-sm"
+                        >
                           <option value="">{lang === 'sw' ? '-- Mkoa --' : '-- Region --'}</option>
-                          {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                          {regions.map(r => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
                         </select>
-                        <select title={lang === 'sw' ? 'Wilaya' : 'District'} aria-label={lang === 'sw' ? 'Chagua wilaya' : 'Select district'}
+                        
+                        <select
+                          title={lang === 'sw' ? 'Chagua wilaya' : 'Select district'}
+                          aria-label={lang === 'sw' ? 'Chagua wilaya' : 'Select district'}
                           value={editFormData.district}
                           onChange={(e) => setEditFormData({ ...editFormData, district: e.target.value })}
                           disabled={!editFormData.region}
-                          className="h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none bg-white text-sm disabled:opacity-50">
+                          className="h-10 px-3 rounded-lg border border-emerald-200 focus:border-emerald-500 outline-none transition-all bg-white text-sm disabled:opacity-50"
+                        >
                           <option value="">{lang === 'sw' ? '-- Wilaya --' : '-- District --'}</option>
-                          {editFormData.region && getDistrictsForRegion(editFormData.region).map(d => <option key={d} value={d}>{d}</option>)}
+                          {editFormData.region && getDistrictsForRegion(editFormData.region).map(d => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
                         </select>
                       </div>
+                      
                       <div className="flex gap-2">
-                        <button onClick={() => setEditingInfo(false)}
-                          className="flex-1 h-10 bg-stone-100 text-stone-600 rounded-xl font-bold hover:bg-stone-200 transition-all text-sm">
+                        <button
+                          onClick={() => setEditingInfo(false)}
+                          className="flex-1 h-10 bg-stone-100 text-stone-600 rounded-xl font-bold hover:bg-stone-200 transition-all text-sm"
+                        >
                           {lang === 'sw' ? 'Ghairi' : 'Cancel'}
                         </button>
-                        <button onClick={handleUpdateInfo} disabled={updating}
-                          className="flex-1 h-10 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all text-sm flex items-center justify-center gap-2">
+                        <button
+                          onClick={handleUpdateInfo}
+                          disabled={updating}
+                          className="flex-1 h-10 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all text-sm flex items-center justify-center gap-2"
+                        >
                           {updating ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                           {lang === 'sw' ? 'Hifadhi' : 'Save'}
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-0.5">{lang === 'sw' ? 'Mkoa' : 'Region'}</p>
-                        <p className="font-bold text-emerald-900 text-sm">{selectedCitizen.region || '—'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-0.5">{lang === 'sw' ? 'Wilaya' : 'District'}</p>
-                        <p className="font-bold text-emerald-900 text-sm">{selectedCitizen.district || '—'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-0.5">{lang === 'sw' ? 'Kata' : 'Ward'}</p>
-                        <p className="font-bold text-emerald-900 text-sm">{selectedCitizen.ward || '—'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mb-0.5">{lang === 'sw' ? 'Mtaa' : 'Street'}</p>
-                        <p className="font-bold text-emerald-900 text-sm">{selectedCitizen.street || '—'}</p>
-                      </div>
+                    <div className="flex items-center gap-2 text-emerald-800">
+                      <span className="font-bold">
+                        {selectedCitizen.region || (lang === 'sw' ? 'Hakuna eneo' : 'No location')}
+                        {selectedCitizen.district ? `, ${selectedCitizen.district}` : ''}
+                      </span>
                     </div>
                   )}
                 </div>
 
-                {/* ── Emergency Contact ── */}
-                {(selectedCitizen.emergency_contact_name || selectedCitizen.emergency_contact_phone) && (
-                  <div>
-                    <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-3">
-                      {lang === 'sw' ? 'Mawasiliano ya Dharura' : 'Emergency Contact'}
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {selectedCitizen.emergency_contact_name && (
-                        <div className="p-3 bg-stone-50 rounded-xl">
-                          <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                            <User size={12} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Jina' : 'Name'}</span>
-                          </div>
-                          <p className="font-bold text-stone-800 text-sm">{selectedCitizen.emergency_contact_name}</p>
-                        </div>
-                      )}
-                      {selectedCitizen.emergency_contact_phone && (
-                        <div className="p-3 bg-stone-50 rounded-xl">
-                          <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                            <Phone size={12} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Simu' : 'Phone'}</span>
-                          </div>
-                          <p className="font-bold text-stone-800 text-sm">{selectedCitizen.emergency_contact_phone}</p>
-                        </div>
-                      )}
-                      {selectedCitizen.emergency_contact_relation && (
-                        <div className="p-3 bg-stone-50 rounded-xl">
-                          <div className="flex items-center gap-1.5 text-stone-400 mb-0.5">
-                            <Users size={12} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Uhusiano' : 'Relation'}</span>
-                          </div>
-                          <p className="font-bold text-stone-800 text-sm">{selectedCitizen.emergency_contact_relation}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Quick Actions (unverified only) ── */}
+                {/* Quick Actions */}
                 {!selectedCitizen.is_verified && (
                   <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
                     <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3">
@@ -1077,10 +931,13 @@ export function CitizenManagement() {
                   </div>
                 )}
 
-                {/* ── Actions ── */}
+                {/* Actions */}
                 <div className="flex gap-3 pt-4 border-t border-stone-100">
                   <button
-                    onClick={() => { setShowDetailsModal(false); setSelectedCitizen(null); }}
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      setSelectedCitizen(null);
+                    }}
                     className="flex-1 h-12 bg-stone-100 text-stone-600 rounded-2xl font-bold hover:bg-stone-200 transition-all"
                   >
                     {lang === 'sw' ? 'Funga' : 'Close'}
