@@ -1230,6 +1230,32 @@ export function Profile() {
           <Building2 className="absolute -right-10 -bottom-10 h-64 w-64 text-white/10 rotate-12" />
         </div>
 
+        {/* Incomplete profile banner */}
+        {!loading && !formData.last_name && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mx-4 sm:mx-8 mt-4 sm:mt-8 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-500 shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <h4 className="font-bold text-red-800 text-sm">
+                  {lang === 'sw' ? 'Wasifu Wako Haujakamilika' : 'Your Profile is Incomplete'}
+                </h4>
+                <p className="text-sm text-red-700 mt-1">
+                  {lang === 'sw'
+                    ? 'Taarifa zako za usajili hazikuhifadhiwa ipasavyo. Tafadhali hariri wasifu wako na ujaze taarifa zako kamili.'
+                    : 'Your registration details were not saved correctly. Please edit your profile and fill in your complete details.'}
+                </p>
+                <button
+                  onClick={() => { setIsEditing(true); setActiveTab('personal'); }}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Edit2 size={12} />
+                  {lang === 'sw' ? 'Kamilisha Wasifu' : 'Complete Profile Now'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Pending changes alert */}
         <AnimatePresence>
           {pendingChanges.length > 0 && (

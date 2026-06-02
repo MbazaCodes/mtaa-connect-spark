@@ -192,33 +192,94 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
         const userEmail = data.user.email?.toLowerCase() || '';
         const isAdminEmail = adminEmails.includes(userEmail);
 
-        // Non-blocking: ensure profile exists and admin emails get admin role
+        // Non-blocking: ensure profile exists and backfill any missing fields from metadata
         (async () => {
           try {
-            // Check if profile already exists (direct query, no RPC dependency)
+            const meta = data.user!.user_metadata || {};
+
+            // Check existing profile — select all key fields
             const { data: existingProfile } = await supabase
               .from('users')
-              .select('id, role')
+              .select('id, role, first_name, last_name, phone, gender, date_of_birth, region, nida_number')
               .eq('id', data.user!.id)
               .maybeSingle();
 
             if (!existingProfile) {
-              // Auto-create a minimal profile (e.g. for staff created by admin)
+              // No profile at all — create full one from metadata
               await supabase.from('users').upsert({
                 id: data.user!.id,
                 email: userEmail,
-                first_name: data.user!.user_metadata?.first_name || userEmail.split('@')[0] || 'User',
-                last_name: data.user!.user_metadata?.last_name || '',
-                middle_name: data.user!.user_metadata?.middle_name || '',
-                phone: data.user!.user_metadata?.phone || '',
-                role: isAdminEmail ? 'admin' : (data.user!.user_metadata?.role as string || 'citizen'),
-                is_verified: false,
-                nationality: 'Tanzanian',
-                country_of_citizenship: 'Tanzania',
+                first_name: meta.first_name || userEmail.split('@')[0] || 'User',
+                last_name: meta.last_name || '',
+                middle_name: meta.middle_name || null,
+                phone: meta.phone || null,
+                sex: meta.sex || null,
+                gender: meta.gender || meta.sex || null,
+                date_of_birth: meta.date_of_birth || null,
+                place_of_birth: meta.place_of_birth || null,
+                marital_status: meta.marital_status || null,
+                occupation: meta.occupation || null,
+                education_level: meta.education_level || null,
+                nationality: meta.nationality || 'Tanzanian',
+                country_of_citizenship: meta.country_of_citizenship || 'Tanzania',
+                nida_number: meta.nida_number || null,
+                id_type: meta.id_type || null,
+                id_number: meta.id_number || null,
+                region: meta.region || null,
+                district: meta.district || null,
+                ward: meta.ward || null,
+                street: meta.street || null,
+                is_diaspora: meta.is_diaspora || false,
+                country_of_residence: meta.country_of_residence || null,
+                passport_number: meta.passport_number || null,
+                is_verified: meta.is_verified || false,
+                role: isAdminEmail ? 'admin' : (meta.role || 'citizen'),
+                account_status: 'active',
               }, { onConflict: 'id' });
-            } else if (isAdminEmail && existingProfile.role !== 'admin') {
-              // Auto-promote admin emails
-              await supabase.from('users').update({ role: 'admin' }).eq('id', data.user!.id);
+
+            } else {
+              // Profile exists — backfill fields that are still empty
+              // (covers case where trigger created a minimal row from empty metadata)
+              const backfill: Record<string, unknown> = {};
+              const isMinimalProfile = existingProfile.first_name === userEmail.split('@')[0]
+                || existingProfile.first_name === 'User'
+                || (!existingProfile.last_name && !existingProfile.phone);
+
+              if (isMinimalProfile && Object.keys(meta).length > 2) {
+                // Overwrite minimal placeholder with real signup data
+                if (meta.first_name) backfill.first_name = meta.first_name;
+                if (meta.middle_name) backfill.middle_name = meta.middle_name;
+                if (meta.last_name) backfill.last_name = meta.last_name;
+                if (meta.phone) backfill.phone = meta.phone;
+                if (meta.sex) backfill.sex = meta.sex;
+                if (meta.gender || meta.sex) backfill.gender = meta.gender || meta.sex;
+                if (meta.date_of_birth) backfill.date_of_birth = meta.date_of_birth;
+                if (meta.place_of_birth) backfill.place_of_birth = meta.place_of_birth;
+                if (meta.marital_status) backfill.marital_status = meta.marital_status;
+                if (meta.occupation) backfill.occupation = meta.occupation;
+                if (meta.education_level) backfill.education_level = meta.education_level;
+                if (meta.nationality) backfill.nationality = meta.nationality;
+                if (meta.country_of_citizenship) backfill.country_of_citizenship = meta.country_of_citizenship;
+                if (meta.nida_number) backfill.nida_number = meta.nida_number;
+                if (meta.id_type) backfill.id_type = meta.id_type;
+                if (meta.id_number) backfill.id_number = meta.id_number;
+                if (meta.region) backfill.region = meta.region;
+                if (meta.district) backfill.district = meta.district;
+                if (meta.ward) backfill.ward = meta.ward;
+                if (meta.street) backfill.street = meta.street;
+                if (meta.is_diaspora !== undefined) backfill.is_diaspora = meta.is_diaspora;
+                if (meta.country_of_residence) backfill.country_of_residence = meta.country_of_residence;
+                if (meta.passport_number) backfill.passport_number = meta.passport_number;
+                if (meta.is_verified !== undefined) backfill.is_verified = meta.is_verified;
+              }
+
+              if (isAdminEmail && existingProfile.role !== 'admin') {
+                backfill.role = 'admin';
+              }
+
+              if (Object.keys(backfill).length > 0) {
+                await supabase.from('users').update(backfill).eq('id', data.user!.id);
+              }
             }
           } catch {
             // Profile init is non-blocking — login still succeeds
@@ -362,6 +423,37 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
       const { data, error } = await supabase.auth.signUp({
         email: regForm.email,
         password: regForm.password,
+        options: {
+          data: {
+            // Pass ALL form fields as metadata so handle_new_user trigger
+            // can create a full profile even without the RPC
+            first_name: regForm.firstName.trim().toUpperCase(),
+            middle_name: regForm.middleName.trim().toUpperCase() || null,
+            last_name: regForm.lastName.trim().toUpperCase(),
+            phone: regForm.phone ? regForm.phone.replace(/[\s\-().]/g, '') : null,
+            sex: regForm.sex,
+            gender: regForm.sex,
+            date_of_birth: regForm.dateOfBirth || null,
+            place_of_birth: regForm.placeOfBirth || null,
+            marital_status: regForm.maritalStatus || null,
+            occupation: regForm.occupation || null,
+            education_level: regForm.educationLevel || null,
+            nationality: regForm.nationality === 'Mtanzania' ? 'Tanzanian' : 'Foreigner',
+            country_of_citizenship: regForm.nationality === 'Mtanzania' ? 'Tanzania' : regForm.countryOfCitizenship,
+            nida_number: regForm.hasNida ? regForm.nidaNumber.replace(/-/g, '') : null,
+            id_type: !regForm.hasNida ? (regForm.idType || null) : null,
+            id_number: !regForm.hasNida ? (regForm.idNumber || null) : null,
+            region: regForm.region || null,
+            district: regForm.district || null,
+            ward: regForm.ward || null,
+            street: regForm.street || null,
+            is_diaspora: regForm.country !== 'Tanzania',
+            country_of_residence: regForm.country || null,
+            passport_number: regForm.passportNumber || null,
+            is_verified: nidaVerified || regForm.country !== 'Tanzania' || regForm.nationality === 'Mwingine',
+            role: 'citizen',
+          }
+        }
       });
 
       console.log('[Signup] signUp response:', { userId: data?.user?.id, session: !!data?.session, error: error?.message });
@@ -443,10 +535,13 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
         console.warn('[Signup] RPC exception:', rpcCatch);
       }
 
-      // Try Method B: Direct INSERT (works if session exists — email confirm OFF)
+      // Try Method B: Direct UPSERT (overwrites the minimal row the trigger created)
       if (!profileOk) {
-        console.log('[Signup] Trying direct INSERT...');
-        const { error: insertErr } = await supabase.from('users').insert(profileRow);
+        console.log('[Signup] Trying direct UPSERT...');
+        const { error: insertErr } = await supabase.from('users').upsert(profileRow, {
+          onConflict: 'id',
+          ignoreDuplicates: false,
+        });
         if (insertErr) {
           console.warn('[Signup] Direct INSERT failed:', insertErr.message);
           // Profile creation failed entirely — auth user exists but no profile.
