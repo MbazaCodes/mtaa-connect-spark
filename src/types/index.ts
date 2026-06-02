@@ -11,6 +11,7 @@ export type ViewName =
   | 'agreement'
   | 'apply'
   | 'applications'
+  | 'notifications'
   | 'profile'
   | 'verify_documents'
   // Staff

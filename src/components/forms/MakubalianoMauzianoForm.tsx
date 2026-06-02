@@ -17,6 +17,7 @@ import {
 import { FormProps, labels } from './types';
 import { ProgressFill } from '../ui/ProgressFill';
 import { supabase } from '../../lib/supabase';
+import { createAgreementNotification, createNotification } from '../../lib/notifications';
 
 // ─── Fee calculator ──────────────────────────────────────────────────────────
 const FEE_RATE = 0.03;
@@ -214,6 +215,32 @@ export const MakubalianoMauzianoForm: React.FC<FormProps> = ({
         seller_id: userProfile?.id, total_fee: fee,
         service_name: 'Makubaliano ya Mauzo', application_reference: ref,
       }, docs.map(d => d.file));
+
+      // Notify buyer — best-effort, doesn't block success state
+      if (buyerFound?.id && userProfile?.id) {
+        const sellerName = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim();
+        const assetLabel = ASSET_TYPES.find(a => a.value === vals.asset_type)?.label?.split('(')[0].trim() || 'mali';
+        const msg = lang === 'sw'
+          ? `${sellerName} amekuwa amewasilisha Makubaliano ya Mauzo (${ref}) kukuhusisha wewe kama mnunuzi wa ${assetLabel} kwa bei ya TSh ${saleValue.toLocaleString()}. Tafadhali fungua Maombi Yangu kukubali au kukataa.`
+          : `${sellerName} has filed a Sales Agreement (${ref}) naming you as buyer of ${assetLabel} for TSh ${saleValue.toLocaleString()}. Please open My Applications to accept or reject.`;
+        await Promise.all([
+          createNotification({
+            user_id: buyerFound.id,
+            title: lang === 'sw' ? 'Makubaliano ya Mauzo Yamewasilishwa Kwako' : 'Sales Agreement Filed With You',
+            message: msg,
+            type: 'info',
+          }),
+          createAgreementNotification({
+            application_id: ref, // reference number stored as link
+            sender_id: userProfile.id,
+            recipient_id: buyerFound.id,
+            recipient_citizen_id: (buyerFound as any).citizen_id || null,
+            notification_type: 'sales_agreement_pending_acceptance',
+            message: msg,
+          }),
+        ]);
+      }
+
       setAppRef(ref); setSubmitted(true);
     } catch { } finally { setSubmitting(false); }
   };

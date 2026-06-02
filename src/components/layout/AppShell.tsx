@@ -19,6 +19,7 @@ export const VIEW_PATHS: Record<ViewName, string> = {
   services:            '/services',
   apply:               '/apply',
   applications:        '/applications',
+  notifications:       '/notifications',
   profile:             '/profile',
   verify_documents:    '/verify',
   agreement:            '/agreement',

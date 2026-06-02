@@ -17,6 +17,7 @@ import {
 import { FormProps, labels } from './types';
 import { ProgressFill } from '../ui/ProgressFill';
 import { supabase } from '../../lib/supabase';
+import { createAgreementNotification, createNotification } from '../../lib/notifications';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const PROPERTY_TYPES = [
@@ -224,6 +225,32 @@ export const MakubalianoPangoForm: React.FC<FormProps> = ({
         landlord_id: userProfile?.id, total_fee: serviceFee,
         service_name: 'Makubaliano ya Pango', application_reference: ref,
       }, docs.map(d => d.file));
+
+      // Notify tenant — best-effort
+      if (tenantFound?.id && userProfile?.id) {
+        const landlordName = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim();
+        const propLabel = PROPERTY_TYPES.find(p => p.value === vals.property_type)?.label?.split('(')[0].trim() || 'mali';
+        const msg = lang === 'sw'
+          ? `${landlordName} amekuwasilisha Makubaliano ya Pango (${ref}) kukuhusisha wewe kama mpangaji wa ${propLabel} kwa kodi ya TSh ${monthlyRent.toLocaleString()}/mwezi. Tafadhali fungua Maombi Yangu kukubali au kukataa.`
+          : `${landlordName} has filed a Rental Agreement (${ref}) naming you as tenant of ${propLabel} at TSh ${monthlyRent.toLocaleString()}/month. Please open My Applications to accept or reject.`;
+        await Promise.all([
+          createNotification({
+            user_id: tenantFound.id,
+            title: lang === 'sw' ? 'Makubaliano ya Pango Yamewasilishwa Kwako' : 'Rental Agreement Filed With You',
+            message: msg,
+            type: 'info',
+          }),
+          createAgreementNotification({
+            application_id: ref,
+            sender_id: userProfile.id,
+            recipient_id: tenantFound.id,
+            recipient_citizen_id: (tenantFound as any).citizen_id || null,
+            notification_type: 'rental_agreement_pending_acceptance',
+            message: msg,
+          }),
+        ]);
+      }
+
       setAppRef(ref); setSubmitted(true);
     } catch { } finally { setSubmitting(false); }
   };

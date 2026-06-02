@@ -25,6 +25,7 @@ import { Services } from './pages/Services';
 import { Apply } from './pages/Apply';
 import { Applications } from './pages/Applications';
 import { Agreement } from './pages/Agreement';
+import { Notifications } from './pages/Notifications';
 import { Profile } from './pages/Profile';
 import { Auth } from './pages/Auth';
 import { VerifyDocuments } from './components/VerifyDocuments';
@@ -247,6 +248,7 @@ export default function App() {
           <Route path="/applications" element={<ProtectedRoute allowedRoles={['citizen']}><AppShell><PageTransition><ApplicationsRoute /></PageTransition></AppShell></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><AppShell><PageTransition><Profile /></PageTransition></AppShell></ProtectedRoute>} />
             <Route path="/agreement" element={<ProtectedRoute allowedRoles={['citizen']}><AppShell><PageTransition><Agreement /></PageTransition></AppShell></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><AppShell><PageTransition><Notifications /></PageTransition></AppShell></ProtectedRoute>} />
           <Route path="/verify-docs" element={<ProtectedRoute><AppShell><PageTransition>
             <VerifyDocuments lang={lang} onBack={() => window.history.back()} userRole="citizen" />
           </PageTransition></AppShell></ProtectedRoute>} />

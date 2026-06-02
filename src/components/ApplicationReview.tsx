@@ -28,6 +28,7 @@ import {
   CheckCircle2, AlertTriangle, FileCheck, DollarSign
 } from 'lucide-react';
 import { supabase, Application, UserProfile } from '@/lib/supabase';
+import { createNotification } from '@/lib/notifications';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/context/ToastContext';
@@ -227,7 +228,19 @@ export function ApplicationReview({ lang }: ApplicationReviewProps) {
       approved_at: new Date().toISOString(),
       approved_by: user.id,
     });
-    if (ok) showToast(L('Maombi yameidhinishwa', 'Application approved'), 'success');
+    if (ok) {
+      showToast(L('Maombi yameidhinishwa', 'Application approved'), 'success');
+      if (selected.user_id) {
+        await createNotification({
+          user_id: selected.user_id,
+          title: lang === 'sw' ? 'Maombi Yameidhinishwa' : 'Application Approved',
+          message: lang === 'sw'
+            ? `Maombi yako ya ${selected.service_name} (${selected.application_number}) yameidhinishwa.`
+            : `Your ${selected.service_name} application (${selected.application_number}) has been approved.`,
+          type: 'success',
+        });
+      }
+    }
   };
 
   const handleReject = async () => {
@@ -240,6 +253,16 @@ export function ApplicationReview({ lang }: ApplicationReviewProps) {
     if (ok) {
       showToast(L('Maombi yamekataliwa', 'Application rejected'), 'success');
       setShowRejectModal(false);
+      if (selected.user_id) {
+        await createNotification({
+          user_id: selected.user_id,
+          title: lang === 'sw' ? 'Maombi Yamekataliwa' : 'Application Rejected',
+          message: (lang === 'sw'
+            ? `Maombi yako ya ${selected.service_name} (${selected.application_number}) yamekataliwa. Sababu: `
+            : `Your ${selected.service_name} application (${selected.application_number}) has been rejected. Reason: `) + rejectionReason,
+          type: 'error',
+        });
+      }
       setRejectionReason('');
     }
   };
@@ -254,6 +277,16 @@ export function ApplicationReview({ lang }: ApplicationReviewProps) {
     if (ok) {
       showToast(L('Ombi la taarifa zaidi limetumwa', 'Info request sent to citizen'), 'success');
       setShowInfoRequestModal(false);
+      if (selected.user_id) {
+        await createNotification({
+          user_id: selected.user_id,
+          title: lang === 'sw' ? 'Taarifa Zaidi Zinahitajika' : 'Additional Info Required',
+          message: (lang === 'sw'
+            ? `Ofisi imeomba taarifa zaidi kuhusu maombi yako ya ${selected.service_name}: `
+            : `The office has requested more info on your ${selected.service_name} application: `) + infoRequest,
+          type: 'warning',
+        });
+      }
       setInfoRequest('');
     }
   };
@@ -264,7 +297,19 @@ export function ApplicationReview({ lang }: ApplicationReviewProps) {
       status: 'paid',
       paid_at: new Date().toISOString(),
     });
-    if (ok) showToast(L('Imewekwa kuwa imelipiwa', 'Marked as paid'), 'success');
+    if (ok) {
+      showToast(L('Imewekwa kuwa imelipiwa', 'Marked as paid'), 'success');
+      if (selected.user_id) {
+        await createNotification({
+          user_id: selected.user_id,
+          title: lang === 'sw' ? 'Malipo Yamethibitishwa' : 'Payment Confirmed',
+          message: lang === 'sw'
+            ? `Malipo ya maombi yako (${selected.application_number}) yamethibitishwa.`
+            : `Payment for your application (${selected.application_number}) has been confirmed.`,
+          type: 'success',
+        });
+      }
+    }
   };
 
   const handleVerify = async () => {
@@ -274,7 +319,19 @@ export function ApplicationReview({ lang }: ApplicationReviewProps) {
       verified_at: new Date().toISOString(),
       verified_by: user.id,
     });
-    if (ok) showToast(L('Imethibitishwa', 'Verified'), 'success');
+    if (ok) {
+      showToast(L('Imethibitishwa', 'Verified'), 'success');
+      if (selected.user_id) {
+        await createNotification({
+          user_id: selected.user_id,
+          title: lang === 'sw' ? 'Maombi Yamethibitishwa' : 'Application Verified',
+          message: lang === 'sw'
+            ? `Maombi yako (${selected.application_number}) yamethibitishwa.`
+            : `Your application (${selected.application_number}) has been verified.`,
+          type: 'success',
+        });
+      }
+    }
   };
 
   const handleIssue = async () => {
@@ -284,7 +341,19 @@ export function ApplicationReview({ lang }: ApplicationReviewProps) {
       issued_at: new Date().toISOString(),
       issued_by: user.id,
     });
-    if (ok) showToast(L('Hati imetolewa', 'Document issued'), 'success');
+    if (ok) {
+      showToast(L('Hati imetolewa', 'Document issued'), 'success');
+      if (selected.user_id) {
+        await createNotification({
+          user_id: selected.user_id,
+          title: lang === 'sw' ? 'Hati Yako Iko Tayari' : 'Your Document Is Ready',
+          message: lang === 'sw'
+            ? `Hati rasmi ya ${selected.service_name} iko tayari. Pakua kutoka Maombi Yangu.`
+            : `Your official ${selected.service_name} document is ready. Download from My Applications.`,
+          type: 'success',
+        });
+      }
+    }
   };
 
   // ─── Categorized form_data ──────────────────────────────────────────────

@@ -14,7 +14,8 @@ import {
   Settings,
   HelpCircle,
   UserCheck,
-  Activity
+  Activity,
+  Bell
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -104,6 +105,12 @@ export function Sidebar({ currentView, setView }: SidebarProps) {
             label={t('nav.myApplications')} 
             active={currentView === 'applications'} 
             onClick={() => setView('applications')} 
+          />
+          <SidebarItem
+            icon={<Bell size={20} />}
+            label={lang === 'sw' ? 'Arifa' : 'Notifications'}
+            active={currentView === 'notifications'}
+            onClick={() => setView('notifications')}
           />
         </>
       )}

@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { LogOut, Menu, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LogOut, Menu, Loader2, Bell } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { cn, TanzanianBranding } from '../../lib/utils';
 import { TANZANIA_LOGO_URL } from '@/constants/services';
+import { countUnreadNotifications } from '@/lib/notifications';
+import { useRouterView } from './AppShell';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -12,7 +14,22 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, signOut } = useAuth();
   const { lang, setLang } = useLanguage();
+  const { setView } = useRouterView();
   const [signingOut, setSigningOut] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Poll unread count every 30s
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    const tick = async () => {
+      const n = await countUnreadNotifications(user.id);
+      if (!cancelled) setUnreadCount(n);
+    };
+    tick();
+    const interval = setInterval(tick, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [user?.id]);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -83,6 +100,24 @@ export function Header({ onMenuClick }: HeaderProps) {
             EN
           </button>
         </div>
+
+        {/* Notification Bell */}
+        {user && (
+          <button
+            onClick={() => setView('notifications')}
+            className="relative p-2 text-stone-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1"
+            aria-label="Notifications"
+            title={lang === 'sw' ? 'Arifa zako' : 'Your notifications'}
+            type="button"
+          >
+            <Bell size={20} aria-hidden="true" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow ring-2 ring-white">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+        )}
 
         {user && (
           <div className="text-right hidden md:block">

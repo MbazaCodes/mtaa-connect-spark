@@ -16,7 +16,8 @@ import {
   UserCheck,
   Activity,
   X,
-  LogOut
+  LogOut,
+  Bell
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -61,6 +62,13 @@ export function MobileNav({ isOpen, onClose, currentView, setView }: MobileNavPr
       label: lang === 'sw' ? 'Maombi Yangu' : 'My Applications',
       roles: ['citizen'],
       view: 'applications'
+    },
+    {
+      id: 'notifications',
+      icon: <Bell size={20} />,
+      label: lang === 'sw' ? 'Arifa' : 'Notifications',
+      roles: ['citizen', 'staff', 'admin'],
+      view: 'notifications'
     },
     {
       id: 'staff_management',
