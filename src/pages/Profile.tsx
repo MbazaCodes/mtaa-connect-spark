@@ -635,6 +635,12 @@ export function Profile() {
     }
   };
 
+  // Helper: update form data and mark dirty
+  const updateForm = (updates: Partial<FormData>) => {
+    setFormData(prev => ({ ...prev, ...updates }));
+    setIsDirty(true);
+  };
+
   // Derived data for address fields
   const regions = useMemo(() => TANZANIA_ADDRESS_DATA.map(r => r.name), []);
   
@@ -1154,7 +1160,7 @@ export function Profile() {
                     }}
                   />
                 ) : (
-                  <span>{(user?.first_name?.[0] || '').toUpperCase()}{(user?.last_name?.[0] || '').toUpperCase()}</span>
+                  <span>{(formData.first_name?.[0] || user?.first_name?.[0] || '').toUpperCase()}{(formData.last_name?.[0] || user?.last_name?.[0] || '').toUpperCase()}</span>
                 )}
               </motion.div>
               <motion.button 
@@ -1178,7 +1184,7 @@ export function Profile() {
             </div>
             <div className="text-center md:text-left space-y-2 flex-1">
               <h2 className="text-3xl md:text-4xl font-black tracking-tight">
-                {user?.first_name} {user?.middle_name || ''} {user?.last_name}
+                {formData.first_name || user?.first_name} {formData.middle_name || user?.middle_name || ''} {formData.last_name || user?.last_name}
               </h2>
               <div className="flex flex-wrap justify-center md:justify-start gap-3">
                 <motion.span 
@@ -1217,7 +1223,7 @@ export function Profile() {
               </p>
               <p className="text-white/80 text-sm flex items-center gap-2 justify-center md:justify-start">
                 <Phone size={14} />
-                {user?.phone}
+                {formData.phone || user?.phone || (lang === 'sw' ? 'Simu haijatolewa' : 'Phone not provided')}
               </p>
             </div>
           </div>
@@ -2705,7 +2711,7 @@ export function Profile() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleSaveProfile}
-                  disabled={saving || !isDirty}
+                  disabled={saving}
                   className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
