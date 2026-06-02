@@ -1,47 +1,15 @@
-import { createClient, Session as SupabaseSession } from '@supabase/supabase-js';
+import type { Session as SupabaseSession, SupabaseClient } from '@supabase/supabase-js';
 import type { AnyFormData, PaymentData, FormField, ApplicationStatus } from '@/types';
+import { supabase as cloudSupabase } from '@/integrations/supabase/client';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key';
-
-// --- Startup diagnostic: prints what the app actually loaded ---
-// Helps catch the #1 cause of login timeouts: a missing or unread .env file.
-if (typeof window !== 'undefined') {
-  const usingPlaceholder = supabaseUrl.includes('placeholder');
-  // eslint-disable-next-line no-console
-  console.info(
-    `%c[Supabase Config] URL: ${supabaseUrl} | Key: ${supabaseAnonKey.slice(0, 12)}…${supabaseAnonKey.slice(-6)}`,
-    `color: ${usingPlaceholder ? '#dc2626' : '#059669'}; font-weight: bold`
-  );
-  if (usingPlaceholder) {
-    // eslint-disable-next-line no-console
-    console.error(
-      '[Supabase Config] ❌ .env NOT loaded — using placeholder URL. ' +
-      'Create a .env file in the project root with VITE_SUPABASE_URL and ' +
-      'VITE_SUPABASE_ANON_KEY, then FULLY restart the dev server (Ctrl+C, npm run dev).'
-    );
-  }
-  // Masked debug: reveal only whether keys are present and a short preview.
-  try {
-    // Only run in browser environment to avoid leaking in server logs.
-    if (typeof window !== 'undefined') {
-      const anonPreview = supabaseAnonKey && supabaseAnonKey.length > 12
-        ? `${supabaseAnonKey.slice(0, 6)}...${supabaseAnonKey.slice(-6)}`
-        : supabaseAnonKey;
-      // eslint-disable-next-line no-console
-      console.debug('Supabase config:', { supabaseUrl, anonKeyLoaded: !!supabaseAnonKey, anonKeyPreview: anonPreview });
-    }
-  } catch (e) {
-    // ignore
-  }
-}
-
-// Client is always created so imports don't fail at module load time.
-// IS_SUPABASE_CONFIGURED (src/lib/config.ts) guards all actual network calls.
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Use the Lovable Cloud client (auto-generated, always configured).
+// Cast to untyped client so the existing app code (which queries custom
+// tables not yet present in generated Database types) keeps compiling.
+export const supabase = cloudSupabase as unknown as SupabaseClient;
 
 // Re-export Session type
 export type Session = SupabaseSession;
+
 
 export interface Service {
   id: string;
