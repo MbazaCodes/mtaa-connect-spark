@@ -1018,47 +1018,41 @@ export const UtambulishoMkaziForm: React.FC<FormProps> = ({
             </p>
           </div>
 
-          {/* Purpose — locked to Resident Identity since this IS that service */}
+          {/* Purpose — locked: this service is purely for resident identification */}
           <div>
-            <label className={lbl}>{L('Sababu ya Maombi', 'Purpose of Application')}</label>
+            <label className={lbl}>{L('Madhumuni ya Maombi', 'Purpose of Application')}</label>
             <div className="w-full px-4 py-3 border border-emerald-300 rounded-xl bg-emerald-50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle size={15} className="text-emerald-600 shrink-0"/>
-                <span className="text-sm font-bold text-emerald-800">
-                  {L('Utambulisho wa Mkazi — Resident Identity', 'Resident Identity — Utambulisho wa Mkazi')}
-                </span>
+                <div>
+                  <p className="text-sm font-bold text-emerald-800">
+                    {L('Kujitambulisha Mkazi', 'Resident Self-Introduction')}
+                  </p>
+                  <p className="text-xs text-emerald-600">
+                    {L('Uthibitisho rasmi wa kuishi katika mtaa/kijiji hiki',
+                       'Official confirmation of residing in this street/village')}
+                  </p>
+                </div>
               </div>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wide">
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wide shrink-0">
                 {L('Imewekwa', 'Fixed')}
               </span>
             </div>
-            <p className="text-xs text-stone-400 mt-1">
-              {L('Sababu imewekwa kwa sababu unatumia fomu ya Utambulisho wa Mkazi.',
-                 'Purpose is fixed because you are using the Resident Identity form.')}
-            </p>
           </div>
 
-          {/* Secondary purpose — why do they need this document */}
-          <Field name="purpose_details"
-            label={L('Unahitaji Utambulisho huu kwa Ajili ya Nini? (Hiari)', 'What do you need this Identity for? (Optional)')}
-            hint={L('Mfano: Kufungua akaunti ya benki, maombi ya kazi, n.k.', 'E.g. Opening a bank account, job application, etc.')}>
-            <Sel name="purpose_details" value={vals.purpose_details}
-              onChange={v => { set('purpose_details', v); clrErr('purpose_details'); }}
-              options={[
-                { label: L('Kufungua Akaunti ya Benki', 'Opening Bank Account'), value: 'BENKI' },
-                { label: L('Maombi ya Ajira', 'Job Application'), value: 'AJIRA' },
-                { label: L('Maombi ya Chuo / Shule', 'School / College Application'), value: 'CHUO' },
-                { label: L('Huduma za Afya', 'Health Services'), value: 'AFYA' },
-                { label: L('Kuomba Pasipoti / Visa', 'Passport / Visa Application'), value: 'PASIPOTI' },
-                { label: L('Kuomba Leseni', 'License Application'), value: 'LESENI' },
-                { label: L('Usajili wa Biashara', 'Business Registration'), value: 'BIASHARA' },
-                { label: L('Huduma za Serikali', 'Government Services'), value: 'SERIKALI' },
-                { label: L('Kuomba Mkopo', 'Loan Application'), value: 'MKOPO' },
-                { label: L('Kununua / Kupanga Nyumba', 'Buying / Renting Property'), value: 'MALI' },
-                { label: L('Nyinginezo', 'Other'), value: 'NYINGINEZO' },
-              ]}
-              placeholder={L('Chagua (Hiari)', 'Select (Optional)')} />
-          </Field>
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex gap-2">
+            <Info size={14} className="text-blue-500 shrink-0 mt-0.5"/>
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-blue-700">
+                {L('Unahitaji barua kwa ajili ya Benki, Kazi, Shule, n.k.?',
+                   'Need a letter for Bank, Employment, School, etc.?')}
+              </p>
+              <p className="text-xs text-blue-600">
+                {L('Omba huduma ya "Barua ya Utambulisho" baada ya kupata Utambulisho huu wa Mkazi.',
+                   'Apply for the "Introduction Letter" service after receiving this Resident Identity.')}
+              </p>
+            </div>
+          </div>
 
           <Field name="residency_status" label={L('Hadhi ya Ukazi', 'Residency Status')} required>
             <Sel name="residency_status" value={vals.residency_status}
@@ -1251,7 +1245,7 @@ export const UtambulishoMkaziForm: React.FC<FormProps> = ({
           {/* Status & Purpose */}
           <PSection icon={<Activity size={14}/>} title={L('Sababu na Hadhi', 'Purpose & Status')} stepKey="status">
             <PRow label={L('Aina ya Hati', 'Document Type')} value={L('Utambulisho wa Mkazi', 'Resident Identity')} />
-            {vals.purpose_details && <PRow label={L('Inahitajika kwa', 'Needed for')} value={vals.purpose_details} />}
+            <PRow label={L('Madhumuni', 'Purpose')} value={L('Kujitambulisha Mkazi', 'Resident Self-Introduction')} />
             <PRow label={L('Hadhi ya Ukazi', 'Residency Status')} value={RESIDENCY_STATUS.find(r => r.value === vals.residency_status)?.label} />
             {vals.residency_status === 'FOREIGNER' && <PRow label="Work Permit" value={WORK_PERMIT_OPTIONS.find(w => w.value === vals.work_permit)?.label} />}
             {vals.passport_number && <PRow label={L('Pasipoti', 'Passport')} value={vals.passport_number} />}
