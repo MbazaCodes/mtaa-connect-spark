@@ -147,9 +147,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Clear local state immediately so UI responds right away
     setUser(null);
     setSession(null);
+    // Fire signOut in background with a 5s timeout — never block the UI
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise<void>((_, reject) => setTimeout(() => reject(new Error('signOut timeout')), 5000))
+      ]);
+    } catch {
+      // Ignore — local state already cleared, user is logged out in the UI
+    }
   };
 
   const updateUser = async (data: Partial<UserProfile>) => {

@@ -1,5 +1,5 @@
-import React from 'react';
-import { LogOut, Menu } from 'lucide-react';
+import React, { useState } from 'react';
+import { LogOut, Menu, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { cn, TanzanianBranding } from '../../lib/utils';
@@ -12,6 +12,14 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, signOut } = useAuth();
   const { lang, setLang } = useLanguage();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    await signOut();
+    // state clears immediately so this may not render, but reset just in case
+    setSigningOut(false);
+  };
 
   return (
     <header className="bg-white border-b border-stone-200 px-4 sm:px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
@@ -88,13 +96,14 @@ export function Header({ onMenuClick }: HeaderProps) {
         )}
 
         <button
-          onClick={signOut}
-          className="p-2 text-stone-400 hover:text-red-500 transition-colors hidden sm:block focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-lg"
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="p-2 text-stone-400 hover:text-red-500 transition-colors hidden sm:block focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-lg disabled:opacity-50"
           aria-label="Logout"
           title="Sign out of your account"
           type="button"
         >
-          <LogOut size={20} aria-hidden="true" />
+          {signingOut ? <Loader2 size={20} className="animate-spin" aria-hidden="true" /> : <LogOut size={20} aria-hidden="true" />}
         </button>
       </div>
     </header>

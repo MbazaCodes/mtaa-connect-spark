@@ -2767,7 +2767,7 @@ export function Profile() {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={signOut}
+                  onClick={async () => { await signOut(); }}
                   className="bg-stone-100 text-stone-600 px-8 py-3 rounded-xl font-bold hover:bg-stone-200 transition-all flex items-center justify-center gap-2"
                 >
                   <LogOut size={18} />
