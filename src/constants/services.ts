@@ -310,5 +310,39 @@ HARDCODED_SERVICES.push(
       footer: "Mkataba huu ni rasmi baada ya kuthibitishwa na Ofisi ya Serikali ya Mtaa. Nakala moja hutolewa kwa kila upande."
     },
     created_at: new Date().toISOString()
+  },
+  {
+    id: "8",
+    name: "Malipo na Michango",
+    name_en: "Payments & Contributions",
+    description: "Lipa faini, ada ya usafi, michango ya maendeleo, na malipo mengine kwa Serikali ya Mtaa.",
+    description_en: "Pay fines, sanitation fees, development contributions, and other payments to the Local Government.",
+    fee: 0, // Variable — the amount paid IS the deliverable
+    active: true,
+    form_schema: [],
+    diaspora_form_schema: undefined,
+    document_template: {
+      document_type: "RISITI YA MALIPO",
+      header: { country: "JAMHURI YA MUUNGANO WA TANZANIA", office: "OFISI YA RAIS - TAMISEMI", logo_url: "/tz-coat-of-arms.png" },
+      footer: "Risiti rasmi ya malipo kwa Serikali ya Mtaa. Tunza kwa marejeleo."
+    },
+    created_at: new Date().toISOString()
+  },
+  {
+    id: "9",
+    name: "Migogoro na Mashauri",
+    name_en: "Disputes & Local Issues",
+    description: "Wasilisha mgogoro wa kati ya raia (ardhi, ndoa, biashara, n.k.) au ripoti tatizo la kijamii (usafi, barabara, n.k.).",
+    description_en: "File a citizen-to-citizen dispute (land, marriage, business, etc.) or report a community issue (sanitation, roads, etc.).",
+    fee: 0, // Dynamic: 5,000 for citizen disputes, free for community reports
+    active: true,
+    form_schema: [],
+    diaspora_form_schema: undefined,
+    document_template: {
+      document_type: "TAARIFA YA SHAURI",
+      header: { country: "JAMHURI YA MUUNGANO WA TANZANIA", office: "OFISI YA RAIS - TAMISEMI", logo_url: "/tz-coat-of-arms.png" },
+      footer: "Shauri hili lipo chini ya uchunguzi wa Ofisi ya Serikali ya Mtaa."
+    },
+    created_at: new Date().toISOString()
   }
 );
