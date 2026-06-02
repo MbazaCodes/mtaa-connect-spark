@@ -1194,11 +1194,85 @@ export function AdminDashboard({ setView }: { setView?: (view: string) => void }
             </div>
           </div>
 
-          {/* Detailed Reports */}
+          {/* Detailed Reports — Service-Level Table */}
           <div className="bg-white rounded-4xl p-8 border border-stone-100 shadow-xl">
             <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
               <FileText size={20} className="text-emerald-600" />
-              {lang === 'sw' ? 'Ripoti za Kina' : 'Detailed Reports'}
+              {lang === 'sw' ? 'Ripoti ya Kina ya Huduma' : 'Detailed Service Report'}
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-stone-50 border-b border-stone-200">
+                    <th className="text-left px-4 py-3 text-xs font-bold text-stone-500 uppercase tracking-wider">{lang === 'sw' ? 'Huduma' : 'Service'}</th>
+                    <th className="text-center px-3 py-3 text-xs font-bold text-stone-500 uppercase tracking-wider">{lang === 'sw' ? 'Jumla' : 'Total'}</th>
+                    <th className="text-center px-3 py-3 text-xs font-bold text-emerald-600 uppercase tracking-wider">✓</th>
+                    <th className="text-center px-3 py-3 text-xs font-bold text-amber-600 uppercase tracking-wider">⏳</th>
+                    <th className="text-center px-3 py-3 text-xs font-bold text-red-600 uppercase tracking-wider">✗</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-stone-500 uppercase tracking-wider">{lang === 'sw' ? 'Kiwango' : 'Rate'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {HARDCODED_SERVICES.map((svc, i) => {
+                    const c = serviceCounts[svc.name] || { total: 0, approved: 0, pending: 0, rejected: 0 };
+                    const rate = c.total > 0 ? Math.round((c.approved / c.total) * 100) : 0;
+                    const icons = ['🪪', '🕊', '🎉', '🏗', '📝', '🤝', '🔑', '💰', '⚖'];
+                    return (
+                      <tr key={svc.id} className="hover:bg-stone-50/50">
+                        <td className="px-4 py-3 font-medium text-stone-800">
+                          <span className="mr-1.5">{icons[i] || '📋'}</span>
+                          {lang === 'sw' ? svc.name : (svc.name_en || svc.name)}
+                        </td>
+                        <td className="px-3 py-3 text-center font-bold text-stone-900">{c.total}</td>
+                        <td className="px-3 py-3 text-center font-bold text-emerald-600">{c.approved}</td>
+                        <td className="px-3 py-3 text-center font-bold text-amber-600">{c.pending}</td>
+                        <td className="px-3 py-3 text-center font-bold text-red-600">{c.rejected}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${
+                            rate >= 80 ? 'bg-emerald-100 text-emerald-700' :
+                            rate >= 50 ? 'bg-amber-100 text-amber-700' :
+                            rate > 0  ? 'bg-red-100 text-red-700' :
+                            'bg-stone-100 text-stone-500'}`}>
+                            {rate}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-stone-50 border-t-2 border-stone-200">
+                    <td className="px-4 py-3 font-black text-stone-900">{lang === 'sw' ? 'JUMLA' : 'TOTAL'}</td>
+                    <td className="px-3 py-3 text-center font-black text-stone-900">
+                      {Object.values(serviceCounts).reduce((s, c) => s + c.total, 0)}
+                    </td>
+                    <td className="px-3 py-3 text-center font-black text-emerald-600">
+                      {Object.values(serviceCounts).reduce((s, c) => s + c.approved, 0)}
+                    </td>
+                    <td className="px-3 py-3 text-center font-black text-amber-600">
+                      {Object.values(serviceCounts).reduce((s, c) => s + c.pending, 0)}
+                    </td>
+                    <td className="px-3 py-3 text-center font-black text-red-600">
+                      {Object.values(serviceCounts).reduce((s, c) => s + c.rejected, 0)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-black text-stone-600">
+                      {(() => {
+                        const totalAll = Object.values(serviceCounts).reduce((s, c) => s + c.total, 0);
+                        const approvedAll = Object.values(serviceCounts).reduce((s, c) => s + c.approved, 0);
+                        return totalAll > 0 ? `${Math.round((approvedAll / totalAll) * 100)}%` : '—';
+                      })()}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Quick Links */}
+          <div className="bg-white rounded-4xl p-8 border border-stone-100 shadow-xl">
+            <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
+              <FileText size={20} className="text-emerald-600" />
+              {lang === 'sw' ? 'Ripoti za Maeneo' : 'Area Reports'}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button 

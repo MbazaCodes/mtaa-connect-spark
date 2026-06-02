@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { IS_SUPABASE_CONFIGURED } from '@/lib/config';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/context/ToastContext';
+import { TANZANIA_ADDRESS_DATA } from '@/lib/addressData';
 import { cn } from '@/lib/utils';
 
 type LocationLevel = 'region' | 'district' | 'ward' | 'street';
@@ -40,16 +41,23 @@ interface DemoLocation extends Location {
   isDemo?: boolean;
 }
 
-const DEMO_LOCATIONS: DemoLocation[] = [
-  { id: 'demo-1', name: 'Dar es Salaam', level: 'region', parent_id: null },
-  { id: 'demo-2', name: 'Arusha', level: 'region', parent_id: null },
-  { id: 'demo-3', name: 'Kinondoni', level: 'district', parent_id: 'demo-1' },
-  { id: 'demo-4', name: 'Ilala', level: 'district', parent_id: 'demo-1' },
-  { id: 'demo-5', name: 'Arusha MJ', level: 'district', parent_id: 'demo-2' },
-  { id: 'demo-6', name: 'Kijitonyama', level: 'ward', parent_id: 'demo-3' },
-  { id: 'demo-7', name: 'Sinza', level: 'ward', parent_id: 'demo-3' },
-  { id: 'demo-8', name: 'Mikocheni', level: 'ward', parent_id: 'demo-3' },
-];
+// Build demo locations from real TANZANIA_ADDRESS_DATA
+const DEMO_LOCATIONS: DemoLocation[] = (() => {
+  const locs: DemoLocation[] = [];
+  let counter = 1;
+  for (const region of TANZANIA_ADDRESS_DATA) {
+    const regionId = `tz-r-${counter++}`;
+    locs.push({ id: regionId, name: region.name, level: 'region', parent_id: null, isDemo: true });
+    for (const district of region.districts) {
+      const districtId = `tz-d-${counter++}`;
+      locs.push({ id: districtId, name: district.name, level: 'district', parent_id: regionId, isDemo: true });
+      for (const ward of district.wards) {
+        locs.push({ id: `tz-w-${counter++}`, name: ward, level: 'ward', parent_id: districtId, isDemo: true });
+      }
+    }
+  }
+  return locs;
+})();
 
 const INITIAL_FORM_DATA: LocationFormData = {
   name: '',
