@@ -21,6 +21,7 @@ import { supabase, Application } from '@/lib/supabase';
 import { IS_SUPABASE_CONFIGURED } from '@/lib/config';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/context/ToastContext';
+import { createNotification } from '@/lib/notifications';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,8 @@ export function CustomerSupport() {
   const [application, setApplication] = useState<Application | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [showMsgBox, setShowMsgBox] = useState(false);
+  const [msgText, setMsgText] = useState('');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,10 +47,11 @@ export function CustomerSupport() {
 
     try {
       const isConfigured = IS_SUPABASE_CONFIGURED;
+      const term = searchTerm.trim();
 
-      if (!isConfigured || searchTerm.toUpperCase().startsWith('EMT-')) {
+      if (!isConfigured || term.toUpperCase().startsWith('EMT-')) {
         const demoApps = JSON.parse(localStorage.getItem('demo_applications') || '[]');
-        const found = demoApps.find((app: import('@/lib/supabase').Application) => app.application_number === searchTerm.trim().toUpperCase());
+        const found = demoApps.find((app: import('@/lib/supabase').Application) => app.application_number === term.toUpperCase());
         
         if (found) {
           setApplication({
@@ -65,14 +69,39 @@ export function CustomerSupport() {
         }
       }
 
-      const { data, error } = await supabase
+      // Try searching by application_number first
+      let { data, error: err } = await supabase
         .from('applications')
         .select('*, services(*), users:user_id(*)')
-        .eq('application_number', searchTerm.trim().toUpperCase())
+        .eq('application_number', term.toUpperCase())
         .single();
 
-      if (error || !data) {
-        setError(lang === 'sw' ? 'Maombi hayajapatikana.' : 'Application not found.');
+      // If not found by app number, try by NIDA → get latest application
+      if ((err || !data) && term.length > 8) {
+        const { data: byNida } = await supabase
+          .from('applications')
+          .select('*, services(*), users:user_id!inner(*)')
+          .eq('users.nida_number', term)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        if (byNida) { data = byNida; err = null; }
+      }
+
+      // Try by phone
+      if ((err || !data) && term.startsWith('+') || term.startsWith('0')) {
+        const { data: byPhone } = await supabase
+          .from('applications')
+          .select('*, services(*), users:user_id!inner(*)')
+          .eq('users.phone', term)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        if (byPhone) { data = byPhone; err = null; }
+      }
+
+      if (err || !data) {
+        setError(lang === 'sw' ? 'Maombi hayajapatikana. Jaribu namba ya maombi, NIDA, au simu.' : 'Application not found. Try app number, NIDA, or phone.');
       } else {
         setApplication(data);
       }
@@ -83,6 +112,25 @@ export function CustomerSupport() {
     }
   };
 
+  const sendMessage = async () => {
+    if (!application || !msgText.trim()) return;
+    setProcessing(true);
+    try {
+      await createNotification({
+        user_id: application.user_id,
+        title: lang === 'sw' ? 'Ujumbe kutoka Ofisi' : 'Message from the Office',
+        message: msgText,
+        type: 'info',
+      });
+      showToast(lang === 'sw' ? 'Ujumbe umetumwa kwa mwombaji.' : 'Message sent to applicant.', 'success');
+      setShowMsgBox(false);
+      setMsgText('');
+    } catch {
+      showToast(lang === 'sw' ? 'Imeshindwa kutuma.' : 'Failed to send.', 'error');
+    }
+    setProcessing(false);
+  };
+
   const handleRefund = async () => {
     if (!application) return;
     if (!confirm(lang === 'sw' ? 'Je, una uhakika unataka kurejesha malipo ya maombi haya?' : 'Are you sure you want to refund this application?')) return;
@@ -90,14 +138,22 @@ export function CustomerSupport() {
     setProcessing(true);
     const { error } = await supabase
       .from('applications')
-      .update({ status: 'submitted' }) // Reset to submitted or a specific 'refunded' status
+      .update({ status: 'refunded' })
       .eq('id', application.id);
 
     if (error) {
       showToast(error.message, 'error');
     } else {
+      await createNotification({
+        user_id: application.user_id,
+        title: lang === 'sw' ? 'Malipo Yamerejeshwa' : 'Payment Refunded',
+        message: lang === 'sw'
+          ? `Malipo ya maombi yako (${application.application_number}) yamerejeshwa.`
+          : `Payment for your application (${application.application_number}) has been refunded.`,
+        type: 'info',
+      });
       showToast(lang === 'sw' ? 'Malipo yamehusishwa kurejeshwa.' : 'Refund processed successfully.', 'success');
-      setApplication({ ...application, status: 'submitted' });
+      setApplication({ ...application, status: 'refunded' as any });
     }
     setProcessing(false);
   };
@@ -165,7 +221,7 @@ export function CustomerSupport() {
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-stone-400" size={24} />
           <input 
             type="text"
-            placeholder={lang === 'sw' ? 'Ingiza Namba ya Maombi (Mf. EMT-XXXXXX)' : 'Enter Application Number (e.g. EMT-XXXXXX)'}
+            placeholder={lang === 'sw' ? 'Namba ya Maombi, NIDA, au Simu ya mwombaji' : 'Application Number, NIDA, or Phone'}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full h-16 pl-16 pr-40 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-mono text-lg uppercase tracking-widest"
@@ -274,21 +330,39 @@ export function CustomerSupport() {
                 <div className="flex flex-wrap gap-4">
                   <button 
                     onClick={handleRefund}
-                    disabled={processing || application.status === 'submitted'}
+                    disabled={processing || application.status === 'submitted' || application.status === 'refunded'}
                     className="flex-1 h-14 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2 border border-red-100 disabled:opacity-50"
                   >
                     <RefreshCw size={20} />
                     {lang === 'sw' ? 'Rejesha Malipo (Refund)' : 'Process Refund'}
                   </button>
-                  <button className="flex-1 h-14 bg-stone-100 text-stone-600 rounded-2xl font-bold hover:bg-stone-200 transition-all flex items-center justify-center gap-2">
+                  <button onClick={() => setShowMsgBox(!showMsgBox)}
+                    className="flex-1 h-14 bg-stone-100 text-stone-600 rounded-2xl font-bold hover:bg-stone-200 transition-all flex items-center justify-center gap-2">
                     <MessageSquare size={20} />
                     {lang === 'sw' ? 'Tuma Ujumbe' : 'Send Message'}
                   </button>
-                  <button className="flex-1 h-14 bg-stone-900 text-white rounded-2xl font-bold hover:bg-black transition-all flex items-center justify-center gap-2">
-                    <CheckCircle2 size={20} />
-                    {lang === 'sw' ? 'Tatua Tatizo' : 'Resolve Issue'}
-                  </button>
                 </div>
+
+                {/* Message Box */}
+                {showMsgBox && (
+                  <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200 space-y-3">
+                    <textarea value={msgText} onChange={e => setMsgText(e.target.value)}
+                      rows={3}
+                      placeholder={lang === 'sw' ? 'Andika ujumbe kwa mwombaji...' : 'Write a message to the applicant...'}
+                      className="w-full px-4 py-3 border border-stone-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={() => { setShowMsgBox(false); setMsgText(''); }}
+                        className="px-4 py-2 bg-stone-200 text-stone-700 rounded-xl font-bold text-sm">
+                        {lang === 'sw' ? 'Ghairi' : 'Cancel'}
+                      </button>
+                      <button onClick={sendMessage} disabled={!msgText.trim() || processing}
+                        className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2">
+                        {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare size={16} />}
+                        {lang === 'sw' ? 'Tuma' : 'Send'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}

@@ -17,6 +17,7 @@ import { supabase, UserProfile } from '@/lib/supabase';
 import { IS_SUPABASE_CONFIGURED } from '@/lib/config';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/context/ToastContext';
+import { createNotification } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 
 export function ManualVerification() {
@@ -26,6 +27,8 @@ export function ManualVerification() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [processing, setProcessing] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
     fetchUnverifiedUsers();
@@ -69,8 +72,43 @@ export function ManualVerification() {
     if (error) {
       showToast(error.message, 'error');
     } else {
+      await createNotification({
+        user_id: userId,
+        title: lang === 'sw' ? 'Akaunti Yako Imethibitishwa' : 'Your Account Has Been Verified',
+        message: lang === 'sw'
+          ? 'Utambulisho wako umethibitishwa na wafanyakazi. Sasa unaweza kutumia huduma zote.'
+          : 'Your identity has been verified by staff. You can now use all services.',
+        type: 'success',
+      });
       setUsers(prev => prev.filter(u => u.id !== userId));
       showToast(lang === 'sw' ? 'Raia amethibitishwa kikamilifu.' : 'Citizen verified successfully.', 'success');
+    }
+    setProcessing(null);
+  };
+
+  const handleReject = async (userId: string) => {
+    if (!rejectReason.trim()) return;
+    setProcessing(userId);
+    const { error } = await supabase
+      .from('users')
+      .update({ account_status: 'verification_rejected' })
+      .eq('id', userId);
+
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      await createNotification({
+        user_id: userId,
+        title: lang === 'sw' ? 'Uthibitisho Umekataliwa' : 'Verification Rejected',
+        message: (lang === 'sw'
+          ? 'Uthibitisho wa kitambulisho chako umekataliwa. Sababu: '
+          : 'Your identity verification has been rejected. Reason: ') + rejectReason,
+        type: 'error',
+      });
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      showToast(lang === 'sw' ? 'Raia amekataliwa.' : 'Citizen verification rejected.', 'success');
+      setRejectingId(null);
+      setRejectReason('');
     }
     setProcessing(null);
   };
@@ -162,14 +200,40 @@ export function ManualVerification() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => handleVerify(u.id)}
-                      disabled={processing === u.id}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center gap-2 ml-auto disabled:opacity-50"
-                    >
-                      {processing === u.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 size={14} />}
-                      {lang === 'sw' ? 'Thibitisha' : 'Verify'}
-                    </button>
+                    <div className="flex items-center gap-2 justify-end">
+                      {rejectingId === u.id ? (
+                        <div className="flex items-center gap-2">
+                          <input value={rejectReason}
+                            onChange={e => setRejectReason(e.target.value)}
+                            placeholder={lang === 'sw' ? 'Sababu...' : 'Reason...'}
+                            className="w-32 px-2 py-1.5 border border-stone-200 rounded-lg text-xs" />
+                          <button onClick={() => handleReject(u.id)} disabled={processing === u.id || !rejectReason.trim()}
+                            className="px-3 py-1.5 bg-red-600 text-white rounded-lg font-bold text-xs disabled:opacity-50">
+                            {processing === u.id ? <Loader2 className="h-3 w-3 animate-spin" /> : '✓'}
+                          </button>
+                          <button onClick={() => { setRejectingId(null); setRejectReason(''); }}
+                            className="px-2 py-1.5 bg-stone-200 text-stone-600 rounded-lg text-xs">✗</button>
+                        </div>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => setRejectingId(u.id)}
+                            className="px-3 py-2 bg-red-50 text-red-600 rounded-xl font-bold text-xs hover:bg-red-100 transition-all border border-red-100 flex items-center gap-1.5"
+                          >
+                            <XCircle size={13} />
+                            {lang === 'sw' ? 'Kataa' : 'Reject'}
+                          </button>
+                          <button 
+                            onClick={() => handleVerify(u.id)}
+                            disabled={processing === u.id}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center gap-2 disabled:opacity-50"
+                          >
+                            {processing === u.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 size={14} />}
+                            {lang === 'sw' ? 'Thibitisha' : 'Verify'}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
