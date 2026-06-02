@@ -21,8 +21,14 @@ import { ProgressFill } from '../ui/ProgressFill';
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const BASE_FEE = 3000;
-const EXTRA_FEE = 1000;
-const MAX_INSTITUTIONS = 6;
+const MAX_INSTITUTIONS = 10;
+
+// Tiered flat fee: 1 = 3,000 / 2–4 = 5,000 / 5–10 = 10,000
+const calcFee = (count: number): number => {
+  if (count === 1) return 3000;
+  if (count <= 4) return 5000;
+  return 10000;
+};
 
 const PURPOSES = [
   { label: 'Kufungua Akaunti ya Benki (Bank Account Opening)', value: 'BENKI' },
@@ -113,7 +119,7 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
   });
 
   // ─── Fee calculator ─────────────────────────────────────────────────────
-  const totalFee = BASE_FEE + Math.max(0, institutions.length - 1) * EXTRA_FEE;
+  const totalFee = calcFee(institutions.length);
   const fmtFee   = (n: number) => `TSh ${n.toLocaleString()}`;
 
   // ─── Steps ───────────────────────────────────────────────────────────────
@@ -564,24 +570,49 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
 
           {/* Live fee display */}
           <div className="bg-white border border-emerald-200 rounded-xl p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-xs text-stone-500 font-medium">
-                  {L('Ada ya sasa kwa taasisi', 'Current fee for')} {institutions.length} {L(`taasisi${institutions.length !== 1 ? '' : ''}`, `institution${institutions.length !== 1 ? 's' : ''}`)}:
+                  {L('Ada ya sasa', 'Current fee')} — {institutions.length} {L(`taasisi`, `institution${institutions.length !== 1 ? 's' : ''}`)}:
                 </p>
-                <div className="flex items-baseline gap-2 mt-0.5">
-                  <span className="text-2xl font-black text-emerald-600">{fmtFee(totalFee)}</span>
-                  {institutions.length > 1 && (
-                    <span className="text-xs text-stone-400">
-                      ({L('Msingi', 'Base')} {fmtFee(BASE_FEE)} + {institutions.length - 1} × {fmtFee(EXTRA_FEE)})
-                    </span>
-                  )}
-                </div>
+                <span className="text-2xl font-black text-emerald-600">{fmtFee(totalFee)}</span>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-stone-400">{L('Kila taasisi ya ziada', 'Each extra institution')}</p>
-                <p className="text-sm font-black text-stone-600">+ {fmtFee(EXTRA_FEE)}</p>
+              <div className="text-right text-xs text-stone-400 space-y-0.5">
+                <p className={`px-2 py-0.5 rounded-full font-bold ${institutions.length === 1 ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400'}`}>
+                  1 → {fmtFee(3000)}
+                </p>
+                <p className={`px-2 py-0.5 rounded-full font-bold ${institutions.length >= 2 && institutions.length <= 4 ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400'}`}>
+                  2–4 → {fmtFee(5000)}
+                </p>
+                <p className={`px-2 py-0.5 rounded-full font-bold ${institutions.length >= 5 ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400'}`}>
+                  5–10 → {fmtFee(10000)}
+                </p>
               </div>
+            </div>
+            {/* Tier progress bar */}
+            <div className="flex gap-1 mt-1">
+              {[
+                { label: '1', active: institutions.length === 1, fee: '3K' },
+                { label: '2', active: institutions.length === 2, tier: true },
+                { label: '3', active: institutions.length === 3, tier: true },
+                { label: '4', active: institutions.length === 4, tier: true },
+                { label: '5', active: institutions.length === 5, tier2: true },
+                { label: '6', active: institutions.length === 6, tier2: true },
+                { label: '7', active: institutions.length === 7, tier2: true },
+                { label: '8', active: institutions.length === 8, tier2: true },
+                { label: '9', active: institutions.length === 9, tier2: true },
+                { label: '10', active: institutions.length === 10, tier2: true },
+              ].map((slot, i) => (
+                <div key={i} className={`flex-1 h-1.5 rounded-full transition-all ${
+                  i < institutions.length
+                    ? institutions.length <= 1 ? 'bg-emerald-400'
+                      : institutions.length <= 4 ? 'bg-blue-400'
+                      : 'bg-purple-400'
+                    : 'bg-stone-200'}`} />
+              ))}
+            </div>
+            <div className="flex justify-between text-[9px] text-stone-400 mt-1">
+              <span>1</span><span>2</span><span>4</span><span className="ml-1">5</span><span>10</span>
             </div>
           </div>
 
@@ -594,7 +625,7 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
                   <span className={`text-xs font-bold uppercase tracking-wide ${i === 0 ? 'text-emerald-700' : 'text-stone-600'}`}>
                     {i === 0
                       ? L('TAASISI YA KWANZA (MSINGI)', 'PRIMARY INSTITUTION')
-                      : `${L('TAASISI YA', 'INSTITUTION')} ${i + 1} (+${fmtFee(EXTRA_FEE)})`}
+                      : `${L('TAASISI YA', 'INSTITUTION')} ${i + 1}`}
                   </span>
                 </div>
                 {i > 0 && (
@@ -641,7 +672,11 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
             <button type="button" onClick={addInst}
               className="w-full py-3 border-2 border-dashed border-emerald-300 text-emerald-600 rounded-xl text-sm font-bold hover:bg-emerald-50 transition-colors flex items-center justify-center gap-2">
               <Plus size={15}/>
-              {L(`Ongeza Taasisi (+${fmtFee(EXTRA_FEE)})`, `Add Institution (+${fmtFee(EXTRA_FEE)})`)}
+              {institutions.length === 1
+                ? L(`Ongeza Taasisi (Ada: ${fmtFee(5000)})`, `Add Institution (Fee becomes ${fmtFee(5000)})`)
+                : institutions.length === 4
+                ? L(`Ongeza Taasisi (Ada: ${fmtFee(10000)})`, `Add Institution (Fee becomes ${fmtFee(10000)})`)
+                : L('Ongeza Taasisi Nyingine', 'Add Another Institution')}
             </button>
           )}
 
@@ -654,24 +689,26 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
           {/* Fee breakdown */}
           <div className="bg-stone-50 border border-stone-100 rounded-xl p-3">
             <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">
-              {L('Muhtasari wa Ada', 'Fee Breakdown')}
+              {L('Jedwali la Ada', 'Fee Schedule')}
             </p>
             <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-stone-500">{L('Ada ya msingi (taasisi 1)', 'Base fee (1 institution)')}</span>
-                <span className="font-bold text-stone-700">{fmtFee(BASE_FEE)}</span>
-              </div>
-              {institutions.length > 1 && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-stone-500">{L(`Taasisi za ziada (${institutions.length - 1} × ${fmtFee(EXTRA_FEE)})`, `Extra institutions (${institutions.length - 1} × ${fmtFee(EXTRA_FEE)})`)}
+              {[
+                { range: '1', fee: 3000, active: institutions.length === 1 },
+                { range: '2 – 4', fee: 5000, active: institutions.length >= 2 && institutions.length <= 4 },
+                { range: '5 – 10', fee: 10000, active: institutions.length >= 5 },
+              ].map(tier => (
+                <div key={tier.range} className={`flex justify-between items-center text-xs px-2 py-1.5 rounded-lg transition-colors ${tier.active ? 'bg-emerald-100 font-bold text-emerald-800' : 'text-stone-500'}`}>
+                  <span>
+                    {tier.active && '▶ '}
+                    {L(`Taasisi ${tier.range}`, `Institution${tier.range === '1' ? '' : 's'} ${tier.range}`)}
                   </span>
-                  <span className="font-bold text-stone-700">{fmtFee((institutions.length - 1) * EXTRA_FEE)}</span>
+                  <span className={tier.active ? 'text-emerald-700 font-black' : 'font-semibold'}>{fmtFee(tier.fee)}</span>
                 </div>
-              )}
-              <div className="flex justify-between text-sm border-t border-stone-200 pt-1 mt-1">
-                <span className="font-bold text-stone-700">{L('JUMLA', 'TOTAL')}</span>
-                <span className="font-black text-emerald-600">{fmtFee(totalFee)}</span>
-              </div>
+              ))}
+            </div>
+            <div className="flex justify-between text-sm border-t border-stone-200 pt-2 mt-2">
+              <span className="font-bold text-stone-700">{L('UNALIPA SASA', 'YOU PAY NOW')}</span>
+              <span className="font-black text-emerald-600">{fmtFee(totalFee)}</span>
             </div>
           </div>
         </div>
@@ -853,19 +890,13 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
               <span className="font-bold text-emerald-800 text-sm">{L('Ada ya Jumla:', 'Total Fee:')}</span>
               <span className="text-2xl font-black text-emerald-600">{fmtFee(totalFee)}</span>
             </div>
-            <div className="space-y-1 text-xs text-emerald-700 border-t border-emerald-200 pt-2">
-              <div className="flex justify-between">
-                <span>{L('Msingi (taasisi 1)', 'Base (1 institution)')}</span>
-                <span className="font-bold">{fmtFee(BASE_FEE)}</span>
-              </div>
-              {institutions.length > 1 && (
-                <div className="flex justify-between">
-                  <span>{L(`Taasisi za ziada (${institutions.length - 1})`, `Extra institutions (${institutions.length - 1})`)}
-                  </span>
-                  <span className="font-bold">{fmtFee((institutions.length - 1) * EXTRA_FEE)}</span>
-                </div>
-              )}
-            </div>
+            <p className="text-xs text-emerald-700">
+              {institutions.length === 1
+                ? L('Taasisi 1 — kiwango cha chini', '1 institution — minimum tier')
+                : institutions.length <= 4
+                ? L(`Taasisi ${institutions.length} — kiwango cha kati (2–4)`, `${institutions.length} institutions — mid tier (2–4)`)
+                : L(`Taasisi ${institutions.length} — kiwango cha juu (5–10)`, `${institutions.length} institutions — top tier (5–10)`)}
+            </p>
           </div>
 
           {/* Consent */}
