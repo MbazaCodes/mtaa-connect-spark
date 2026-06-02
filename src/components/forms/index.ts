@@ -10,29 +10,21 @@ export { UtambulishoMkaziForm } from './UtambulishoMkaziForm';
 export { BaruaUtambulishoForm } from './BaruaUtambulishoForm';
 export { KibariMazishiForm } from './KibariMazishiForm';
 export { KibariShereheForm } from './KibariShereheForm';
+export { KibariUjeziMdogoForm } from './KibariUjeziMdogoForm';
 
 import { UtambulishoMkaziForm } from './UtambulishoMkaziForm';
 import { BaruaUtambulishoForm } from './BaruaUtambulishoForm';
 import { KibariMazishiForm } from './KibariMazishiForm';
 import { KibariShereheForm } from './KibariShereheForm';
+import { KibariUjeziMdogoForm } from './KibariUjeziMdogoForm';
 import React from 'react';
 import { FormProps } from './types';
 
-// Map service names to their form components
-// IMPORTANT: These names must match exactly with HARDCODED_SERVICES in services.ts
 export const SERVICE_FORMS: Record<string, React.FC<FormProps>> = {
-  // Utambulisho wa Mkazi - Resident Identity
   'Utambulisho wa Mkazi': UtambulishoMkaziForm,
-
-  // Kibari cha Mazishi - Burial Permit
   'Kibari cha Mazishi': KibariMazishiForm,
-
-  // Kibari cha Sherehe - Celebration Permit
   'Kibari cha Sherehe': KibariShereheForm,
-
-  // Kibari cha Ujezi Mdogo - uses dynamic form generator (no dedicated form)
-
-  // Barua ya Utambulisho - Introduction Letter
+  'Kibari cha Ujezi Mdogo': KibariUjeziMdogoForm,
   'Barua ya Utambulisho': BaruaUtambulishoForm,
 };
 
