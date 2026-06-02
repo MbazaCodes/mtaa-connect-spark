@@ -7,14 +7,24 @@
 export { UtambulishoMkaziPDF } from './UtambulishoMkaziPDF';
 export { KibariMazishiPDF } from './KibariMazishiPDF';
 export { KibariSherehePDF } from './KibariSherehePDF';
+export { KibariUjeziMdogoPDF } from './KibariUjeziMdogoPDF';
+export { BaruaUtambulishoPDF } from './BaruaUtambulishoPDF';
+export { MakubalianoMauzianoPDF } from './MakubalianoMauzianoPDF';
+export { MakubalianoPangoPDF } from './MakubalianoPangoPDF';
 export { RisitiMalipoPDF } from './RisitiMalipoPDF';
+export { MgogoroMashauriPDF } from './MgogoroMashauriPDF';
 
 export * from './types';
 
 import { UtambulishoMkaziPDF } from './UtambulishoMkaziPDF';
 import { KibariMazishiPDF } from './KibariMazishiPDF';
 import { KibariSherehePDF } from './KibariSherehePDF';
+import { KibariUjeziMdogoPDF } from './KibariUjeziMdogoPDF';
+import { BaruaUtambulishoPDF } from './BaruaUtambulishoPDF';
+import { MakubalianoMauzianoPDF } from './MakubalianoMauzianoPDF';
+import { MakubalianoPangoPDF } from './MakubalianoPangoPDF';
 import { RisitiMalipoPDF } from './RisitiMalipoPDF';
+import { MgogoroMashauriPDF } from './MgogoroMashauriPDF';
 import type { DocumentPDFProps } from './types';
 import React from 'react';
 
@@ -23,14 +33,15 @@ import React from 'react';
  * IMPORTANT: These names must match exactly with HARDCODED_SERVICES in services.ts
  */
 export const SERVICE_DOCUMENTS: Record<string, React.FC<DocumentPDFProps>> = {
-  // Utambulisho wa Mkazi - Resident Identity
   'Utambulisho wa Mkazi': UtambulishoMkaziPDF,
-
-  // Kibari cha Mazishi - Burial Permit
   'Kibari cha Mazishi': KibariMazishiPDF,
-
-  // Kibari cha Sherehe - Celebration Permit
   'Kibari cha Sherehe': KibariSherehePDF,
+  'Kibari cha Ujezi Mdogo': KibariUjeziMdogoPDF,
+  'Barua ya Utambulisho': BaruaUtambulishoPDF,
+  'Makubaliano ya Mauzo': MakubalianoMauzianoPDF,
+  'Makubaliano ya Pango': MakubalianoPangoPDF,
+  'Malipo na Michango': RisitiMalipoPDF,
+  'Migogoro na Mashauri': MgogoroMashauriPDF,
 };
 
 export function getServiceDocument(serviceName: string): React.FC<DocumentPDFProps> | undefined {
