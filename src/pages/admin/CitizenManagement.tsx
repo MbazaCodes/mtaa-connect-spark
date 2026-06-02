@@ -57,7 +57,7 @@ export function CitizenManagement() {
   const [citizens, setCitizens] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState<'all' | 'verified' | 'unverified'>('all');
+  const [filter, setFilter] = useState<'all' | 'verified' | 'unverified' | 'sellers' | 'landlords' | 'brokers'>('all');
   const [activeTab, setActiveTab] = useState<'citizens' | 'profile-changes'>('citizens');
   const [pendingChanges, setPendingChanges] = useState<PendingProfileChange[]>([]);
   const [loadingChanges, setLoadingChanges] = useState(false);
@@ -393,17 +393,24 @@ export function CitizenManagement() {
   };
 
   const filteredCitizens = citizens.filter(c => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch = 
-      c.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.first_name.toLowerCase().includes(q) ||
+      c.last_name.toLowerCase().includes(q) ||
+      c.email.toLowerCase().includes(q) ||
       c.nida_number?.includes(searchQuery) ||
-      c.citizen_id?.toLowerCase().includes(searchQuery.toLowerCase());
+      c.phone?.includes(searchQuery) ||
+      c.citizen_id?.toLowerCase().includes(q) ||
+      c.seller_id?.toLowerCase().includes(q) ||
+      c.landlord_id?.toLowerCase().includes(q);
     
     const matchesFilter = 
       filter === 'all' || 
       (filter === 'verified' && c.is_verified) || 
-      (filter === 'unverified' && !c.is_verified);
+      (filter === 'unverified' && !c.is_verified) ||
+      (filter === 'sellers' && !!c.seller_id) ||
+      (filter === 'landlords' && !!c.landlord_id) ||
+      (filter === 'brokers' && !!c.broker_id);
 
     return matchesSearch && matchesFilter;
   });
@@ -453,6 +460,9 @@ export function CitizenManagement() {
             <option value="all">{lang === 'sw' ? 'Wote' : 'All'}</option>
             <option value="verified">{lang === 'sw' ? 'Waliothibitishwa' : 'Verified'}</option>
             <option value="unverified">{lang === 'sw' ? 'Wasiohakikiwa' : 'Unverified'}</option>
+            <option value="sellers">{lang === 'sw' ? '🏪 Wauzaji' : '🏪 Sellers'}</option>
+            <option value="landlords">{lang === 'sw' ? '🔑 Wapangishaji' : '🔑 Landlords'}</option>
+            <option value="brokers">{lang === 'sw' ? '👥 Madalali' : '👥 Brokers'}</option>
           </select>
         </div>
       </div>
@@ -621,17 +631,36 @@ export function CitizenManagement() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {citizen.is_verified ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold">
-                          <ShieldCheck size={14} />
-                          {lang === 'sw' ? 'Imehakikiwa' : 'Verified'}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-bold">
-                          <ShieldAlert size={14} />
-                          {lang === 'sw' ? 'Inasubiri' : 'Pending'}
-                        </span>
-                      )}
+                      <div className="space-y-1.5">
+                        {citizen.is_verified ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold">
+                            <ShieldCheck size={14} />
+                            {lang === 'sw' ? 'Imehakikiwa' : 'Verified'}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-bold">
+                            <ShieldAlert size={14} />
+                            {lang === 'sw' ? 'Inasubiri' : 'Pending'}
+                          </span>
+                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {citizen.seller_id && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-sm">
+                              🏪 {lang === 'sw' ? 'Muuzaji' : 'Seller'}
+                            </span>
+                          )}
+                          {citizen.landlord_id && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-sm">
+                              🔑 {lang === 'sw' ? 'Mpangishaji' : 'Landlord'}
+                            </span>
+                          )}
+                          {citizen.broker_id && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black bg-gradient-to-r from-purple-500 to-fuchsia-600 text-white shadow-sm">
+                              👥 {lang === 'sw' ? 'Dalali' : 'Broker'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -846,6 +875,33 @@ export function CitizenManagement() {
                         )}
                       </div>
                     </div>
+
+                    {/* Business Roles */}
+                    {(selectedCitizen.seller_id || selectedCitizen.landlord_id || selectedCitizen.broker_id) && (
+                      <div className="p-3 bg-stone-50 rounded-xl">
+                        <div className="flex items-center gap-1.5 text-stone-400 mb-1.5">
+                          <Briefcase size={12} />
+                          <span className="text-[10px] font-bold uppercase tracking-wider">{lang === 'sw' ? 'Hadhi ya Biashara' : 'Business Roles'}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedCitizen.seller_id && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+                              🏪 {lang === 'sw' ? 'Muuzaji' : 'Seller'}: <span className="font-mono text-blue-100">{selectedCitizen.seller_id}</span>
+                            </span>
+                          )}
+                          {selectedCitizen.landlord_id && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
+                              🔑 {lang === 'sw' ? 'Mpangishaji' : 'Landlord'}: <span className="font-mono text-emerald-100">{selectedCitizen.landlord_id}</span>
+                            </span>
+                          )}
+                          {selectedCitizen.broker_id && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black bg-gradient-to-r from-purple-500 to-fuchsia-600 text-white">
+                              👥 {lang === 'sw' ? 'Dalali' : 'Broker'}: <span className="font-mono text-purple-100">{selectedCitizen.broker_id}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
