@@ -245,6 +245,7 @@ export default function App() {
           <Route path="/apply" element={<ProtectedRoute allowedRoles={['citizen']}><AppShell><PageTransition><ApplyRoute /></PageTransition></AppShell></ProtectedRoute>} />
           <Route path="/applications" element={<ProtectedRoute allowedRoles={['citizen']}><AppShell><PageTransition><ApplicationsRoute /></PageTransition></AppShell></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><AppShell><PageTransition><Profile /></PageTransition></AppShell></ProtectedRoute>} />
+            <Route path="/agreement" element={<ProtectedRoute allowedRoles={['citizen']}><AppShell><PageTransition><Agreement /></PageTransition></AppShell></ProtectedRoute>} />
           <Route path="/verify-docs" element={<ProtectedRoute><AppShell><PageTransition>
             <VerifyDocuments lang={lang} onBack={() => window.history.back()} userRole="citizen" />
           </PageTransition></AppShell></ProtectedRoute>} />

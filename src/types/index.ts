@@ -8,6 +8,7 @@
 export type ViewName =
   | 'dashboard'
   | 'services'
+  | 'agreement'
   | 'apply'
   | 'applications'
   | 'profile'

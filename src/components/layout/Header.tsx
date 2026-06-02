@@ -89,8 +89,11 @@ export function Header({ onMenuClick }: HeaderProps) {
             <p className="text-sm font-bold text-stone-800">
               {user.first_name} {user.last_name}
             </p>
-            <p className="text-xs text-stone-500 capitalize">
-              {user.role} {user.is_diaspora && '(Diaspora)'}
+            <p className="text-xs text-stone-500 capitalize flex items-center gap-2">
+              <span>{user.role} {user.is_diaspora && '(Diaspora)'}</span>
+              {(user.seller_id || user.landlord_id) && (
+                <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded font-bold">{user.seller_id ? 'Seller' : 'Landlord'}</span>
+              )}
             </p>
           </div>
         )}

@@ -93,6 +93,12 @@ export function Sidebar({ currentView, setView }: SidebarProps) {
             active={currentView === 'services' || currentView === 'apply'} 
             onClick={() => setView('services')} 
           />
+          <SidebarItem
+            icon={<FileText size={20} />}
+            label={lang === 'sw' ? 'Makubaliano' : 'Agreement'}
+            active={currentView === 'agreement'}
+            onClick={() => setView('agreement')}
+          />
           <SidebarItem 
             icon={<FileText size={20} />} 
             label={t('nav.myApplications')} 

@@ -49,6 +49,13 @@ export function MobileNav({ isOpen, onClose, currentView, setView }: MobileNavPr
       view: 'services'
     },
     {
+      id: 'agreement',
+      icon: <FileText size={20} />,
+      label: lang === 'sw' ? 'Makubaliano' : 'Agreement',
+      roles: ['citizen'],
+      view: 'agreement'
+    },
+    {
       id: 'applications',
       icon: <FileText size={20} />,
       label: lang === 'sw' ? 'Maombi Yangu' : 'My Applications',
