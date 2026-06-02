@@ -34,7 +34,8 @@ export function StaffDashboard({ setView }: StaffDashboardProps) {
     paid: 0,
     returned: 0,
     approved: 0,
-    total: 0
+    total: 0,
+    pendingBusiness: 0, // Pending business registration applications
   });
 
   useEffect(() => {
@@ -60,11 +61,12 @@ export function StaffDashboard({ setView }: StaffDashboardProps) {
         });
 
         setStats({
-          pending: filteredApps.filter((a: import('@/lib/supabase').Application) => a.status === 'submitted').length,
+          pending: filteredApps.filter((a: import('@/lib/supabase').Application) => a.status === 'submitted' || a.status === 'pending_review').length,
           paid: filteredApps.filter((a: import('@/lib/supabase').Application) => a.status === 'paid').length,
           returned: filteredApps.filter((a: import('@/lib/supabase').Application) => a.status === 'returned').length,
           approved: filteredApps.filter((a: import('@/lib/supabase').Application) => a.status === 'approved' || a.status === 'issued').length,
-          total: filteredApps.length
+          total: filteredApps.length,
+          pendingBusiness: 0,
         });
 
         setApplications(filteredApps.slice(0, 10).map((app: Application) => ({
@@ -87,13 +89,20 @@ export function StaffDashboard({ setView }: StaffDashboardProps) {
 
       const { data: allApps, error: statsError } = await statsQuery;
       
+      // Also fetch pending business registrations count
+      const { count: pendingBusinessCount } = await supabase
+        .from('business_registrations')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
       if (allApps) {
         setStats({
-          pending: allApps.filter(a => a.status === 'submitted').length,
+          pending: allApps.filter(a => a.status === 'submitted' || a.status === 'pending_review').length,
           paid: allApps.filter(a => a.status === 'paid').length,
           returned: allApps.filter(a => a.status === 'returned').length,
           approved: allApps.filter(a => a.status === 'approved' || a.status === 'issued').length,
-          total: allApps.length
+          total: allApps.length,
+          pendingBusiness: pendingBusinessCount || 0,
         });
       }
 
@@ -250,6 +259,23 @@ export function StaffDashboard({ setView }: StaffDashboardProps) {
                   <p className="text-sm font-bold">{lang === 'sw' ? 'Uhakiki wa Mwongozo' : 'Manual Verification'}</p>
                   <p className="text-[10px] text-white/60 uppercase tracking-widest font-bold">{lang === 'sw' ? 'Thibitisha Raia' : 'Verify Citizen'}</p>
                 </div>
+              </button>
+              <button 
+                onClick={() => setView('business_approval')}
+                className="w-full p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 hover:bg-white/20 transition-all flex items-center gap-3 relative"
+              >
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-300">
+                  <Building2 size={20} />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-sm font-bold">{lang === 'sw' ? 'Idhini ya Biashara' : 'Business Approval'}</p>
+                  <p className="text-[10px] text-white/60 uppercase tracking-widest font-bold">{lang === 'sw' ? 'Wauzaji, Mpangishaji, Dalali' : 'Sellers, Landlords, Brokers'}</p>
+                </div>
+                {stats.pendingBusiness > 0 && (
+                  <span className="absolute top-2 right-2 bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg animate-pulse">
+                    {stats.pendingBusiness}
+                  </span>
+                )}
               </button>
               <button 
                 onClick={() => setView('verify_documents')}
