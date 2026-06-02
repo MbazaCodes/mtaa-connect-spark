@@ -4,7 +4,7 @@ import { ArrowRight, RefreshCw } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { HARDCODED_SERVICES } from '@/constants/services';
 import { Service } from '@/lib/supabase';
-import { formatCurrency } from '@/lib/currency';
+import { formatCurrency, getCurrencyForUser } from '@/lib/currency';
 import { useAuth } from '@/context/AuthContext';
 import { 
   FileCheck2, 
@@ -22,8 +22,9 @@ interface ServicesProps {
 }
 
 export function Services({ onSelectService, onRefresh }: ServicesProps) {
-  const { lang, currency } = useLanguage();
+  const { lang } = useLanguage();
   const { user } = useAuth();
+  const displayCurrency = getCurrencyForUser(user?.is_diaspora, user?.country_of_residence);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -90,7 +91,7 @@ export function Services({ onSelectService, onRefresh }: ServicesProps) {
                   <Icon size={20} className="sm:w-6 sm:h-6" />
                 </div>
                 <div className="bg-orange-50 text-orange-800 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-bold border border-orange-100">
-                  {formatCurrency(service.fee, currency)}
+                  {formatCurrency(service.fee, displayCurrency)}
                 </div>
               </div>
               

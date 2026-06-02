@@ -10,7 +10,7 @@ import { supabase, Application } from '../lib/supabase';
 import type { ApplicationDraft } from '../types';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { ApplicationProgressBar } from '../components/ui/ApplicationProgressBar';
-import { formatCurrency } from '../lib/currency';
+import { formatCurrency, getCurrencyForUser } from '../lib/currency';
 import { DocumentRenderer, DocumentPreview } from '../components/DocumentRenderer';
 import { ReceiptPDF } from '../components/ReceiptPDF';
 
@@ -24,9 +24,10 @@ interface ApplicationsProps {
 
 export function Applications({ applications, drafts = [], onPay, onRefresh, onResumeDraft }: ApplicationsProps) {
   const PDFDownloadLinkCompat = PDFDownloadLink as unknown as React.ComponentType<any>;
-  const { lang, currency } = useLanguage();
+  const { lang } = useLanguage();
   const { showToast } = useToast();
   const { user } = useAuth();
+  const displayCurrency = getCurrencyForUser(user?.is_diaspora, user?.country_of_residence);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -362,7 +363,7 @@ export function Applications({ applications, drafts = [], onPay, onRefresh, onRe
                     {(app.status === 'submitted' || app.status === 'pending_payment') && getPaymentAmount(app) > 0 ? (
                       <button onClick={(e) => { e.stopPropagation(); onPay(app); }}
                         className="bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition-all">
-                        {t('payNow')} ({formatCurrency(getPaymentAmount(app), currency)})
+                        {t('payNow')} ({formatCurrency(getPaymentAmount(app), displayCurrency)})
                       </button>
                     ) : app.status === 'issued' ? (
                       <div className="flex items-center justify-end gap-3">
@@ -404,7 +405,7 @@ export function Applications({ applications, drafts = [], onPay, onRefresh, onRe
                 {(app.status === 'submitted' || app.status === 'pending_payment') && getPaymentAmount(app) > 0 ? (
                   <button onClick={(e) => { e.stopPropagation(); onPay(app); }}
                     className="w-full bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700">
-                    {t('payNow')} ({formatCurrency(getPaymentAmount(app), currency)})
+                    {t('payNow')} ({formatCurrency(getPaymentAmount(app), displayCurrency)})
                   </button>
                 ) : app.status === 'issued' ? (
                   <div className="space-y-2">

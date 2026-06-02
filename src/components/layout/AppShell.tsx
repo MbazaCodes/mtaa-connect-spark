@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAppContext } from '@/context/AppContext';
 import { IS_SUPABASE_CONFIGURED } from '@/lib/config';
+import { getCurrencyForUser, type CurrencyCode } from '@/lib/currency';
 import type { ViewName } from '@/types';
 
 /** Maps ViewName → URL path */
@@ -53,8 +54,6 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
-type CurrencyCode = 'TZS' | 'USD' | 'EUR' | 'GBP';
-
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const { user } = useAuth();
   const { lang, currency: currencyString } = useLanguage();
@@ -62,10 +61,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const { currentView, setView } = useRouterView();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
-  const currency: CurrencyCode =
-    currencyString === 'TZS' || currencyString === 'USD' || currencyString === 'EUR' || currencyString === 'GBP'
-      ? (currencyString as CurrencyCode)
-      : 'TZS';
+  const currency: CurrencyCode = user
+    ? getCurrencyForUser(user.is_diaspora, user.country_of_residence)
+    : currencyString;
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">

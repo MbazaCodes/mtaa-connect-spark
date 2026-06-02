@@ -8,3 +8,11 @@ export const formatCurrency = (amount: number, currency: string = 'TZS') => {
     maximumFractionDigits: 0
   }).format(amount);
 };
+
+export const getCurrencyForUser = (isDiaspora?: boolean, countryOfResidence?: string | null): CurrencyCode => {
+  if (isDiaspora) return 'USD';
+  if (countryOfResidence && countryOfResidence.trim() !== '' && countryOfResidence.trim().toLowerCase() !== 'tanzania') {
+    return 'USD';
+  }
+  return 'TZS';
+};

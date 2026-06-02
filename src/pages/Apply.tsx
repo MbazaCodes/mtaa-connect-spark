@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { TANZANIA_LOGO_URL } from '@/constants/services';
 import { Service } from '@/lib/supabase';
-import { formatCurrency } from '@/lib/currency';
+import { formatCurrency, getCurrencyForUser } from '@/lib/currency';
 import { DynamicFormGenerator } from '@/components/DynamicFormGenerator';
 import { SERVICE_FORMS, hasServiceForm } from '@/components/forms';
 
@@ -19,7 +19,8 @@ interface ApplyProps {
 
 export function Apply({ selectedService, onBack, onSubmit, draft }: ApplyProps) {
   const { user } = useAuth();
-  const { lang, currency } = useLanguage();
+  const { lang } = useLanguage();
+  const displayCurrency = getCurrencyForUser(user?.is_diaspora, user?.country_of_residence);
 
   // Ensure user profile has all required fields, provide defaults
   const userProfileForForm = user ? {
@@ -80,7 +81,7 @@ export function Apply({ selectedService, onBack, onSubmit, draft }: ApplyProps) 
         
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
           <CreditCard className="h-3 w-3" />
-          {lang === 'sw' ? 'Ada ya Huduma:' : 'Service Fee:'} {formatCurrency(selectedService.fee, currency)}
+          {lang === 'sw' ? 'Ada ya Huduma:' : 'Service Fee:'} {formatCurrency(selectedService.fee, displayCurrency)}
         </div>
       </div>
 

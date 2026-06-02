@@ -489,6 +489,21 @@ export function Profile() {
     }
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!loading && user) {
+      setFormData(prev => ({
+        ...prev,
+        first_name: prev.first_name || user.first_name || '',
+        middle_name: prev.middle_name || user.middle_name || '',
+        last_name: prev.last_name || user.last_name || '',
+        phone: prev.phone || user.phone || '',
+        nationality: prev.nationality || user.nationality || '',
+        is_diaspora: prev.is_diaspora || user.is_diaspora || false,
+        country_of_residence: prev.country_of_residence || user.country_of_residence || '',
+      }));
+    }
+  }, [user, loading]);
+
   const fetchCompleteProfile = async () => {
     setLoading(true);
     try {
@@ -504,6 +519,16 @@ export function Profile() {
 
       if (!data) {
         // Keep existing form values when profile row is unavailable.
+        setFormData(prev => ({
+          ...prev,
+          first_name: user?.first_name || prev.first_name,
+          middle_name: user?.middle_name || prev.middle_name,
+          last_name: user?.last_name || prev.last_name,
+          phone: user?.phone || prev.phone,
+          nationality: user?.nationality || prev.nationality,
+          is_diaspora: user?.is_diaspora || prev.is_diaspora,
+          country_of_residence: user?.country_of_residence || prev.country_of_residence,
+        }));
         setLoading(false);
         return;
       }
