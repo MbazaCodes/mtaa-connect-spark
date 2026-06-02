@@ -213,38 +213,105 @@ export function Landing({ onShowAuth, onShowVerify }: LandingProps) {
         </div>
       </section>
 
-      {/* ── Services Preview ─────────────────────────────────────────────── */}
+      {/* ── All 9 Services ─────────────────────────────────────────────── */}
       <section className="py-14 sm:py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center space-y-3 mb-10 sm:mb-16">
             <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-stone-900">
-              {lang === 'sw' ? 'Huduma Maarufu' : 'Popular Services'}
+              {lang === 'sw' ? 'Huduma Zote Zinazopatikana' : 'All Available Services'}
             </h2>
             <p className="text-stone-500 font-medium max-w-xl mx-auto text-sm sm:text-base">
               {lang === 'sw'
-                ? 'Pata huduma hizi na nyingine nyingi moja kwa moja kupitia mfumo wetu wa kidijitali.'
-                : 'Access these services and many more directly through our digital portal.'}
+                ? 'Huduma 9 za serikali ya mtaa — zote zinapatikana kidijitali kupitia E-MTAA.'
+                : '9 local government services — all available digitally through E-MTAA.'}
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+          {/* Category groups */}
+          {[
+            {
+              category: lang === 'sw' ? '📜 Vibali na Nyaraka' : '📜 Permits & Documents',
+              services: [
+                { icon: '🪪', sw: 'Utambulisho wa Mkazi', en: 'Resident Identity', descSw: 'Pata uthibitisho rasmi wa makazi yako kwenye mtaa wako.', descEn: 'Official proof of residence for banks, schools, passports.', fee: 'TSh 5,000' },
+                { icon: '📝', sw: 'Barua ya Utambulisho', en: 'Introduction Letter', descSw: 'Barua rasmi ya utambulisho kwa taasisi — binafsi, mtoto, au kwa niaba.', descEn: 'Official introduction letter for institutions — self, minor, or on behalf.', fee: 'TSh 3,000–10,000' },
+                { icon: '🕊', sw: 'Kibari cha Mazishi', en: 'Burial Permit', descSw: 'Kibali cha kuzika marehemu kwa heshima na sheria.', descEn: 'Permit to bury the deceased with dignity and legal compliance.', fee: 'TSh 2,000' },
+                { icon: '🎉', sw: 'Kibari cha Sherehe', en: 'Celebration Permit', descSw: 'Kibali cha sherehe, harusi, tamasha, au mkutano.', descEn: 'Permit for celebrations, weddings, festivals, or gatherings.', fee: 'TSh 10,000' },
+                { icon: '🏗', sw: 'Kibari cha Ujezi Mdogo', en: 'Construction Permit', descSw: 'Kibali cha ujenzi mdogo — uzio, choo, upanuzi, n.k.', descEn: 'Permit for minor construction — fence, latrine, extension, etc.', fee: 'TSh 15,000' },
+              ],
+            },
+            {
+              category: lang === 'sw' ? '🤝 Makubaliano na Malipo' : '🤝 Agreements & Payments',
+              services: [
+                { icon: '🤝', sw: 'Makubaliano ya Mauzo', en: 'Sales Agreement', descSw: 'Mkataba rasmi wa mauzo kati ya muuzaji na mnunuzi waliothibitishwa.', descEn: 'Official sales contract between verified seller and buyer.', fee: '3%' },
+                { icon: '🔑', sw: 'Makubaliano ya Pango', en: 'Rental Agreement', descSw: 'Mkataba wa kukodi nyumba kati ya mpangishaji na mpangaji.', descEn: 'Rental contract between verified landlord and tenant.', fee: 'TSh 10,000+' },
+                { icon: '💰', sw: 'Malipo na Michango', en: 'Payments & Contributions', descSw: 'Lipa faini, ada ya usafi, michango ya maendeleo, na malipo mengine.', descEn: 'Pay fines, sanitation fees, development contributions, and more.', fee: lang === 'sw' ? 'Inabadilika' : 'Variable' },
+                { icon: '⚖', sw: 'Migogoro na Mashauri', en: 'Disputes & Issues', descSw: 'Wasilisha mgogoro wa raia au ripoti tatizo la kijamii.', descEn: 'File a citizen dispute or report a community issue.', fee: lang === 'sw' ? 'TSh 5,000 / Bure' : 'TSh 5,000 / Free' },
+              ],
+            },
+          ].map((group, gi) => (
+            <div key={gi} className="mb-10 sm:mb-14 last:mb-0">
+              <h3 className="text-base sm:text-lg font-black text-stone-800 mb-4 sm:mb-6">{group.category}</h3>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {group.services.map((svc, si) => (
+                  <motion.div key={si} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }} transition={{ delay: si * 0.06 }}
+                    className="bg-white p-5 sm:p-6 rounded-2xl border border-stone-200 shadow-sm hover:shadow-lg hover:border-emerald-400 transition-all group">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-stone-100 group-hover:bg-emerald-50 flex items-center justify-center text-xl transition-colors">
+                        {svc.icon}
+                      </div>
+                      <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full text-[10px] font-bold border border-amber-100 shrink-0">
+                        {svc.fee}
+                      </span>
+                    </div>
+                    <h4 className="font-black text-stone-900 text-sm sm:text-base leading-snug mb-1">
+                      {lang === 'sw' ? svc.sw : svc.en}
+                    </h4>
+                    <p className="text-xs text-stone-500 leading-relaxed mb-4">
+                      {lang === 'sw' ? svc.descSw : svc.descEn}
+                    </p>
+                    <button onClick={() => onShowAuth('signup')} type="button"
+                      className="text-emerald-600 font-bold flex items-center gap-1.5 text-xs group-hover:gap-2.5 transition-all">
+                      {lang === 'sw' ? 'Omba Sasa' : 'Apply Now'} <ArrowRight size={14} />
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── How It Works ─────────────────────────────────────────────────── */}
+      <section className="py-14 sm:py-20 px-4 sm:px-6 bg-emerald-50">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center space-y-3 mb-10 sm:mb-14">
+            <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-stone-900">
+              {lang === 'sw' ? 'Jinsi Inavyofanya Kazi' : 'How It Works'}
+            </h2>
+            <p className="text-stone-500 font-medium max-w-lg mx-auto text-sm sm:text-base">
+              {lang === 'sw' ? 'Hatua 4 rahisi — kutoka kwenye simu yako hadi hati rasmi.' : '4 simple steps — from your phone to an official document.'}
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: <FileCheck2 size={22} />, title: lang === 'sw' ? 'Utambulisho wa Mkazi' : 'Resident Identity', desc: lang === 'sw' ? 'Pata uthibitisho rasmi wa makazi yako kwenye mtaa wako.' : 'Proof of residence for banks, schools and passports.' },
-              { icon: <Users2 size={22} />, title: lang === 'sw' ? 'Barua ya Utambulisho' : 'Introduction Letter', desc: lang === 'sw' ? 'Barua rasmi ya utambulisho kwa taasisi mbalimbali.' : 'Official introduction letter for various institutions.' },
-              { icon: <Globe2 size={22} />, title: lang === 'sw' ? 'Huduma za Diaspora' : 'Diaspora Services', desc: lang === 'sw' ? 'Huduma maalum kwa Watanzania waishio nje ya nchi.' : 'Special services for Tanzanians living abroad.' },
-            ].map((service, i) => (
+              { num: '1', icon: <Smartphone size={24} />, sw: 'Jisajili', en: 'Register', descSw: 'Fungua akaunti kwa NIDA yako na uthibitishwe kwa dakika chache.', descEn: 'Create an account with your NIDA and get verified in minutes.' },
+              { num: '2', icon: <FileCheck2 size={24} />, sw: 'Omba Huduma', en: 'Apply', descSw: 'Jaza fomu ya huduma unayoihitaji — moja kwa moja kwenye simu yako.', descEn: 'Fill the service form — directly on your phone.' },
+              { num: '3', icon: <Users2 size={24} />, sw: 'Ofisi Inakagua', en: 'Office Reviews', descSw: 'Wafanyakazi wa serikali ya mtaa wanakagua na kuidhinisha maombi yako.', descEn: 'Local government staff review and approve your application.' },
+              { num: '4', icon: <CheckCircle2 size={24} />, sw: 'Pokea Hati', en: 'Get Document', descSw: 'Pakua hati rasmi au ichukue ofisini — tayari na muhuri.', descEn: 'Download your official document or collect at the office — sealed and signed.' },
+            ].map((step, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }} transition={{ delay: i * 0.1 }}
-                className="bg-white p-6 sm:p-7 rounded-3xl border border-stone-200 shadow-sm hover:shadow-lg hover:border-emerald-400 transition-all group">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
-                  {service.icon}
+                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-emerald-100 relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-black shadow">
+                  {step.num}
                 </div>
-                <h3 className="text-lg font-bold text-stone-900 mb-2">{service.title}</h3>
-                <p className="text-stone-500 leading-relaxed mb-5 font-medium text-sm">{service.desc}</p>
-                <button onClick={() => onShowAuth('signup')} type="button"
-                  className="text-emerald-600 font-bold flex items-center gap-2 text-sm group-hover:gap-3 transition-all">
-                  {lang === 'sw' ? 'Omba Sasa' : 'Apply Now'} <ArrowRight size={16} />
-                </button>
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 mt-2">
+                  {step.icon}
+                </div>
+                <h4 className="font-black text-stone-900 mb-2">{lang === 'sw' ? step.sw : step.en}</h4>
+                <p className="text-xs text-stone-500 leading-relaxed">{lang === 'sw' ? step.descSw : step.descEn}</p>
               </motion.div>
             ))}
           </div>
