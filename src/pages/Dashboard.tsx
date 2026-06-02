@@ -1,22 +1,24 @@
-import React, { useState } from 'react';
+/**
+ * Citizen Dashboard — the main view after login
+ *
+ * Shows: welcome card with business badges, stat cards, quick
+ * actions, pending agreements banner, recent applications.
+ */
+import React, { useState, useEffect } from 'react';
 import type { ViewName } from '@/types';
 import { motion } from 'framer-motion';
-import { 
-  FileText, 
-  Clock, 
-  CheckCircle, 
-  CheckCircle2, 
-  AlertCircle, 
-  Building2,
-  RefreshCw,
-  Search
+import {
+  FileText, Clock, CheckCircle, CheckCircle2, AlertCircle,
+  Building2, RefreshCw, ArrowRight, Bell, Briefcase, Plus,
+  DollarSign, Scale, ShieldCheck, Eye, Loader2, Star
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { PendingApprovals } from '@/components/PendingApprovals';
 import { Application } from '@/lib/supabase';
+import { countUnreadNotifications } from '@/lib/notifications';
+import { supabase } from '@/lib/supabase';
 
 interface DashboardProps {
   applications: Application[];
@@ -27,162 +29,251 @@ interface DashboardProps {
 export function Dashboard({ applications, setView, onRefresh }: DashboardProps) {
   const { user } = useAuth();
   const { lang } = useLanguage();
+  const L = (sw: string, en: string) => (lang === 'sw' ? sw : en);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingAgreements, setPendingAgreements] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    countUnreadNotifications(user.id).then(setUnreadCount);
+    // Count pending agreement notifications
+    supabase
+      .from('agreement_notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('recipient_id', user.id)
+      .eq('is_actioned', false)
+      .then(({ count }) => setPendingAgreements(count || 0));
+  }, [user?.id]);
 
   const handleRefresh = async () => {
     if (!onRefresh) return;
     setIsRefreshing(true);
     await onRefresh();
+    if (user?.id) {
+      const n = await countUnreadNotifications(user.id);
+      setUnreadCount(n);
+    }
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
-  return (
-    <motion.div 
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="space-y-8"
-    >
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-bold text-stone-900">{lang === 'sw' ? 'Dashibodi' : 'Dashboard'}</h1>
-        {onRefresh && (
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl font-semibold text-sm hover:bg-emerald-100 transition-all disabled:opacity-50"
-          >
-            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-            {lang === 'sw' ? 'Onyesha Upya' : 'Refresh'}
-          </button>
-        )}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <StatCard 
-          icon={<FileText className="text-blue-500" />} 
-          label={lang === 'sw' ? "Jumla ya Maombi" : "Total Applications"} 
-          value={applications.length} 
-        />
-        <StatCard 
-          icon={<Clock className="text-amber-500" />} 
-          label={lang === 'sw' ? "Yanasubiri Uhakiki" : "Pending Verification"} 
-          value={applications.filter(a => a.status === 'submitted').length} 
-        />
-        <StatCard 
-          icon={<CheckCircle className="text-emerald-500" />} 
-          label={lang === 'sw' ? "Hati Zilizoidhinishwa" : "Approved Documents"} 
-          value={applications.filter(a => a.status === 'approved' || a.status === 'issued').length} 
-        />
-      </div>
+  // Stats
+  const total    = applications.length;
+  const pending  = applications.filter(a => ['submitted', 'pending_review', 'pending_payment', 'paid', 'verified'].includes(a.status)).length;
+  const approved = applications.filter(a => a.status === 'approved' || a.status === 'issued').length;
+  const rejected = applications.filter(a => a.status === 'rejected').length;
+  const recent   = applications.slice(0, 5);
 
-      {user && (
-        <div className="bg-emerald-600 rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl shadow-emerald-200">
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <h2 className="text-2xl sm:text-3xl font-heading font-extrabold">
-                  {lang === 'sw' ? `Karibu, ${user.first_name || 'Mtumiaji'}` : `Welcome, ${user.first_name || 'User'}`}
-                </h2>
-                {user.is_verified && (
-                  <div className="bg-white/20 backdrop-blur-md p-1 rounded-full border border-white/30" title={lang === 'sw' ? 'Imethibitishwa' : 'Verified'}>
-                    <CheckCircle2 size={18} className="text-emerald-300" />
-                  </div>
+  const hasBizRole = !!(user?.seller_id || user?.landlord_id || user?.broker_id);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-5 sm:space-y-6"
+    >
+      {/* Welcome Card */}
+      <div className="bg-gradient-to-br from-stone-800 via-stone-700 to-emerald-900 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZyIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSIxIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDUpIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCBmaWxsPSJ1cmwoI2cpIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIvPjwvc3ZnPg==')] opacity-50"/>
+        <div className="relative z-10">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-stone-300 text-sm font-medium mb-1">
+                {L('Karibu', 'Welcome back')},
+              </p>
+              <h1 className="text-xl sm:text-2xl font-black mb-2">
+                {user?.first_name} {user?.last_name}
+              </h1>
+              <div className="flex flex-wrap gap-1.5">
+                {user?.is_verified && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/30 text-emerald-200 backdrop-blur-sm">
+                    <ShieldCheck size={10}/> {L('Raia Aliyethibitishwa', 'Verified Citizen')}
+                  </span>
+                )}
+                {user?.seller_id && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold bg-blue-500/30 text-blue-200 backdrop-blur-sm">
+                    🏪 {L('Muuzaji', 'Seller')}
+                  </span>
+                )}
+                {user?.landlord_id && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold bg-teal-500/30 text-teal-200 backdrop-blur-sm">
+                    🔑 {L('Mpangishaji', 'Landlord')}
+                  </span>
+                )}
+                {user?.broker_id && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold bg-purple-500/30 text-purple-200 backdrop-blur-sm">
+                    👥 {L('Dalali', 'Broker')}
+                  </span>
                 )}
               </div>
-              <p className="text-emerald-50 opacity-90 font-medium text-sm sm:text-base">
-                {lang === 'sw' 
-                  ? `Umeingia kama ${user.role === 'citizen' ? 'Mwananchi' : user.role === 'admin' ? 'Msimamizi' : 'Mtumishi'}.`
-                  : `Logged in as ${user.role}.`
-                }
-                <span className="block sm:inline sm:ml-2">
-                  {lang === 'sw' ? 'Eneo lako:' : 'Your Location:'} {
-                    user.role === 'citizen' 
-                      ? `${user.region || '-'}${user.district ? ` / ${user.district}` : ''}`
-                      : `${user.assigned_region || '-'}${user.assigned_district ? ` / ${user.assigned_district}` : ' (Ofisi ya Mkoa)'}`
-                  }
-                </span>
-              </p>
             </div>
-            
-            {user.role === 'citizen' && !user.is_verified && (
-              <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 flex items-center gap-3 w-fit">
-                <AlertCircle size={20} className="text-amber-300 shrink-0" />
-                <div className="text-xs">
-                  <p className="font-bold">{lang === 'sw' ? 'Akaunti Inasubiri Uhakiki' : 'Account Pending Verification'}</p>
-                  <p className="opacity-80">{lang === 'sw' ? 'Tafadhali subiri uhakiki kutoka ofisi ya mtaa.' : 'Please wait for verification from the local government office.'}</p>
-                </div>
-              </div>
-            )}
+            <button onClick={handleRefresh} disabled={isRefreshing}
+              className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50">
+              <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''}/>
+            </button>
           </div>
-          <Building2 className="absolute -right-5 -bottom-5 h-32 sm:h-48 w-32 sm:w-48 text-white/10 rotate-12" />
         </div>
-      )}
-
-      {/* Pending Approvals Section - Show only for citizens */}
-      {user?.role === 'citizen' && (
-        <PendingApprovals lang={lang} />
-      )}
-
-      {/* Verify Documents Card */}
-      <div 
-        onClick={() => setView('verify_documents')}
-        className="bg-linear-to-br from-blue-600 to-indigo-700 rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl shadow-blue-200 cursor-pointer hover:shadow-2xl hover:scale-[1.01] transition-all group"
-      >
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-                <Search size={24} className="text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl sm:text-2xl font-heading font-extrabold">
-                  {lang === 'sw' ? 'Hakiki Hati' : 'Verify Documents'}
-                </h3>
-                <p className="text-blue-100 opacity-90 font-medium text-sm">
-                  {lang === 'sw' 
-                    ? 'Thibitisha uhalali wa hati za serikali'
-                    : 'Verify authenticity of government documents'}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <button
-            className="bg-white/20 backdrop-blur-md text-white px-6 py-3 rounded-xl font-bold hover:bg-white/30 transition-all flex items-center gap-2 group-hover:gap-3"
-          >
-            {lang === 'sw' ? 'Hakiki Sasa' : 'Verify Now'}
-            <Search size={18} className="group-hover:scale-110 transition-transform" />
-          </button>
-        </div>
-        <div className="absolute -right-8 -bottom-8 w-40 h-40 rounded-full bg-white/10 blur-2xl"></div>
       </div>
 
+      {/* Pending Agreements Banner */}
+      {pendingAgreements > 0 && (
+        <motion.button
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={() => setView('notifications')}
+          className="w-full bg-violet-50 border-2 border-violet-300 rounded-2xl p-4 flex items-center gap-3 text-left hover:bg-violet-100 transition-all"
+        >
+          <div className="w-10 h-10 rounded-xl bg-violet-200 flex items-center justify-center shrink-0 animate-pulse">
+            <Scale size={20} className="text-violet-700"/>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-black text-violet-800 text-sm">
+              {pendingAgreements} {L('Makubaliano Yanasubiri Kukubaliwa Kwako', 'Agreement(s) Awaiting Your Acceptance')}
+            </p>
+            <p className="text-xs text-violet-600">
+              {L('Bonyeza hapa kufungua na kukubali au kukataa', 'Tap here to open and accept or reject')}
+            </p>
+          </div>
+          <ArrowRight size={18} className="text-violet-400 shrink-0"/>
+        </motion.button>
+      )}
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard
+          icon={<FileText className="text-blue-500" size={20}/>}
+          label={L('Jumla', 'Total')}
+          value={String(total)}
+          description={L('Maombi yote', 'All applications')}
+        />
+        <StatCard
+          icon={<Clock className="text-amber-500" size={20}/>}
+          label={L('Inaendelea', 'In Progress')}
+          value={String(pending)}
+          description={L('Zinasubiri', 'Pending action')}
+        />
+        <StatCard
+          icon={<CheckCircle className="text-emerald-500" size={20}/>}
+          label={L('Imekamilika', 'Completed')}
+          value={String(approved)}
+          description={L('Zimeidhinishwa', 'Approved/Issued')}
+        />
+        <button onClick={() => setView('notifications')}
+          className="text-left">
+          <StatCard
+            icon={<Bell className="text-rose-500" size={20}/>}
+            label={L('Arifa', 'Notifications')}
+            value={String(unreadCount)}
+            description={L('Hazijasomwa', 'Unread')}
+          />
+        </button>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { icon: Plus,       color: 'emerald', sw: 'Omba Huduma',      en: 'Apply for Service',  view: 'services' as ViewName },
+          { icon: FileText,   color: 'blue',    sw: 'Maombi Yangu',     en: 'My Applications',    view: 'applications' as ViewName },
+          { icon: Briefcase,  color: 'stone',   sw: 'Lango la Biashara',en: 'Business Portal',    view: 'agreement' as ViewName },
+          { icon: Bell,       color: 'rose',    sw: 'Arifa Zangu',      en: 'My Notifications',   view: 'notifications' as ViewName },
+        ].map(action => {
+          const Icon = action.icon;
+          return (
+            <button key={action.view} onClick={() => setView(action.view)}
+              className={`p-4 bg-${action.color}-50 hover:bg-${action.color}-100 border border-${action.color}-200 rounded-2xl transition-all text-left group`}>
+              <Icon size={22} className={`text-${action.color}-600 mb-2 group-hover:scale-110 transition-transform`}/>
+              <p className={`text-sm font-bold text-${action.color}-800`}>
+                {lang === 'sw' ? action.sw : action.en}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Business Role CTA (if no business role yet) */}
+      {!hasBizRole && user?.is_verified && (
+        <button onClick={() => setView('agreement')}
+          className="w-full bg-gradient-to-r from-stone-50 to-amber-50 border-2 border-dashed border-stone-300 hover:border-amber-400 rounded-2xl p-5 flex items-center gap-4 text-left transition-all group">
+          <div className="w-12 h-12 rounded-2xl bg-amber-100 group-hover:bg-amber-200 flex items-center justify-center shrink-0 transition-colors">
+            <Star size={24} className="text-amber-600"/>
+          </div>
+          <div className="flex-1">
+            <p className="font-black text-stone-800">
+              {L('Kuwa Muuzaji, Mpangishaji, au Dalali', 'Become a Seller, Landlord, or Broker')}
+            </p>
+            <p className="text-xs text-stone-500 mt-0.5">
+              {L('Jisajili kufanya biashara kupitia mfumo na kutumia huduma za Makubaliano ya Mauzo na Pango.',
+                 'Register to do business through the system and use Sales and Rental Agreement services.')}
+            </p>
+          </div>
+          <ArrowRight size={18} className="text-stone-400 group-hover:text-amber-600 shrink-0"/>
+        </button>
+      )}
+
+      {/* Recent Applications */}
       <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 flex items-center justify-between">
-          <h2 className="font-bold text-stone-800">{lang === 'sw' ? 'Maombi ya Karibuni' : 'Recent Applications'}</h2>
-          <button onClick={() => setView('applications')} className="text-sm text-emerald-600 font-semibold hover:underline">{lang === 'sw' ? 'Tazama Yote' : 'View All'}</button>
-        </div>
-        <div className="divide-y divide-stone-100">
-          {applications.slice(0, 5).map(app => (
-            <div key={app.id} className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between hover:bg-stone-50 transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-500">
-                  <FileText size={20} />
-                </div>
-                <div>
-                  <p className="font-semibold text-stone-800">{(app as any).services?.name}</p>
-                  <p className="text-xs text-stone-500">{app.application_number}</p>
-                </div>
-              </div>
-              <StatusBadge status={app.status} lang={lang} />
-            </div>
-          ))}
-          {applications.length === 0 && (
-            <div className="px-4 sm:px-6 py-8 sm:py-12 text-center text-stone-400">
-              {lang === 'sw' ? 'Hakuna maombi yaliyopatikana.' : 'No applications found.'}
-            </div>
+        <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
+          <h2 className="font-black text-stone-900 text-sm">
+            {L('Maombi ya Hivi Karibuni', 'Recent Applications')}
+          </h2>
+          {total > 5 && (
+            <button onClick={() => setView('applications')}
+              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+              {L('Ona Yote', 'View All')} <ArrowRight size={12}/>
+            </button>
           )}
         </div>
+        {recent.length === 0 ? (
+          <div className="p-8 text-center">
+            <FileText size={32} className="mx-auto text-stone-300 mb-3"/>
+            <p className="font-bold text-stone-600 text-sm">
+              {L('Bado huna maombi yoyote', 'No applications yet')}
+            </p>
+            <p className="text-xs text-stone-400 mt-1">
+              {L('Bonyeza "Omba Huduma" kuanza', 'Click "Apply for Service" to get started')}
+            </p>
+            <button onClick={() => setView('services')}
+              className="mt-4 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm inline-flex items-center gap-1.5">
+              <Plus size={14}/> {L('Omba Sasa', 'Apply Now')}
+            </button>
+          </div>
+        ) : (
+          <div className="divide-y divide-stone-50">
+            {recent.map(app => {
+              const icons: Record<string, string> = {
+                'Utambulisho wa Mkazi': '🪪', 'Kibari cha Mazishi': '🕊',
+                'Kibari cha Sherehe': '🎉', 'Kibari cha Ujezi Mdogo': '🏗',
+                'Barua ya Utambulisho': '📝', 'Makubaliano ya Mauzo': '🤝',
+                'Makubaliano ya Pango': '🔑', 'Malipo na Michango': '💰',
+                'Migogoro na Mashauri': '⚖',
+              };
+              const icon = icons[app.service_name] || '📋';
+              return (
+                <div key={app.id}
+                  onClick={() => setView('applications')}
+                  className="px-5 py-3.5 hover:bg-stone-50 cursor-pointer transition-colors flex items-center gap-3"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center text-base shrink-0">
+                    {icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-stone-800 truncate">{app.service_name}</p>
+                    <p className="text-xs text-stone-400 font-mono">{app.application_number}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <StatusBadge status={app.status} lang={lang}/>
+                    <p className="text-[10px] text-stone-400 mt-1">
+                      {new Date(app.created_at).toLocaleDateString(lang === 'sw' ? 'sw-TZ' : 'en-US', { day: 'numeric', month: 'short' })}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </motion.div>
   );
 }
+
+export default Dashboard;

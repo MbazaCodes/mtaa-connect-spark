@@ -111,13 +111,21 @@ export function Applications({ applications, drafts = [], onPay, onRefresh, onRe
     if (!user) return;
     setProcessingId(app.id);
     try {
-      const isBuyer = (app as any).services?.name?.includes('Mauziano') && (app.form_data as Record<string, unknown>).buyer_nida as string | undefined === user.nida_number;
-      const isTenant = (app as any).services?.name?.includes('PANGISHA') && (app.form_data as Record<string, unknown>).tenant_nida as string | undefined === user.nida_number;
+      const serviceName = app.service_name || (app as any).services?.name || '';
+      const fd = (app.form_data || {}) as Record<string, unknown>;
+      const isBuyer  = serviceName.includes('Mauzo')  && String(fd.buyer_nida || '') === user.nida_number;
+      const isTenant = serviceName.includes('Pango')   && String(fd.tenant_nida || '') === user.nida_number;
       const updateData: Record<string, unknown> = {};
       if (isBuyer) updateData.buyer_accepted = true;
       if (isTenant) updateData.tenant_accepted = true;
+      if (Object.keys(updateData).length === 0) {
+        showToast(lang === 'sw' ? 'Huwezi kukubali — si mnunuzi wala mpangaji wa mkataba huu.' : 'Cannot accept — you are not the buyer or tenant of this agreement.', 'error');
+        setProcessingId(null);
+        return;
+      }
       const { error } = await supabase.from('applications').update(updateData).eq('id', app.id);
       if (error) throw error;
+      showToast(lang === 'sw' ? 'Umekubali mkataba.' : 'Agreement accepted.', 'success');
       if (onRefresh) onRefresh();
     } catch (error) {
       showToast(lang === 'sw' ? 'Imeshindwa kukubali mkataba.' : 'Failed to accept agreement.', 'error');

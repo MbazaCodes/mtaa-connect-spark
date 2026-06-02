@@ -1,144 +1,182 @@
-import React, { useState } from 'react';
+/**
+ * Services Catalog — citizen selects which service to apply for.
+ *
+ * Categories: Vibali (Permits), Nyaraka (Documents),
+ *   Makubaliano (Agreements), Malipo & Migogoro (Payments & Disputes)
+ * Search, emoji icons, dynamic fee labels, verification gate.
+ */
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, RefreshCw } from 'lucide-react';
+import { ArrowRight, Lock, Search } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { HARDCODED_SERVICES } from '@/constants/services';
 import { Service } from '@/lib/supabase';
 import { formatCurrency, getCurrencyForUser } from '@/lib/currency';
 import { useAuth } from '@/context/AuthContext';
-import { 
-  FileCheck2, 
-  Users2, 
-  PartyPopper, 
-  Skull, 
-  Users,
-  Building2,
-  Lock
-} from 'lucide-react';
 
 interface ServicesProps {
   onSelectService: (service: Service) => void;
   onRefresh?: () => void;
 }
 
-export function Services({ onSelectService, onRefresh }: ServicesProps) {
+const SERVICE_META: Record<string, { icon: string; category: string; feeLabelSw?: string; feeLabelEn?: string }> = {
+  'Utambulisho wa Mkazi':   { icon: '🪪', category: 'documents' },
+  'Kibari cha Mazishi':     { icon: '🕊',  category: 'permits' },
+  'Kibari cha Sherehe':     { icon: '🎉', category: 'permits' },
+  'Kibari cha Ujezi Mdogo': { icon: '🏗', category: 'permits' },
+  'Barua ya Utambulisho':   { icon: '📝', category: 'documents', feeLabelSw: 'TSh 3,000 – 10,000', feeLabelEn: 'TSh 3,000 – 10,000' },
+  'Makubaliano ya Mauzo':   { icon: '🤝', category: 'agreements', feeLabelSw: '3% ya thamani', feeLabelEn: '3% of value' },
+  'Makubaliano ya Pango':   { icon: '🔑', category: 'agreements', feeLabelSw: 'TSh 10,000+', feeLabelEn: 'TSh 10,000+' },
+  'Malipo na Michango':     { icon: '💰', category: 'payments', feeLabelSw: 'Kiasi kinachobadilika', feeLabelEn: 'Variable amount' },
+  'Migogoro na Mashauri':   { icon: '⚖',  category: 'disputes', feeLabelSw: 'TSh 5,000 / Bure', feeLabelEn: 'TSh 5,000 / Free' },
+};
+
+const CATEGORIES = [
+  { id: 'all',        sw: 'Zote',                     en: 'All',                    icon: '📋' },
+  { id: 'permits',    sw: 'Vibali',                    en: 'Permits',                icon: '📜' },
+  { id: 'documents',  sw: 'Nyaraka',                   en: 'Documents & ID',         icon: '📄' },
+  { id: 'agreements', sw: 'Makubaliano',               en: 'Agreements',             icon: '🤝' },
+  { id: 'payments',   sw: 'Malipo',                    en: 'Payments',               icon: '💰' },
+  { id: 'disputes',   sw: 'Migogoro',                  en: 'Disputes & Issues',      icon: '⚖' },
+];
+
+export function Services({ onSelectService }: ServicesProps) {
   const { lang } = useLanguage();
   const { user } = useAuth();
   const displayCurrency = getCurrencyForUser(user?.is_diaspora, user?.country_of_residence);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const L = (sw: string, en: string) => (lang === 'sw' ? sw : en);
 
-  const handleRefresh = async () => {
-    if (!onRefresh) return;
-    setIsRefreshing(true);
-    await onRefresh();
-    setTimeout(() => setIsRefreshing(false), 500);
-  };
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
 
-  const getServiceIcon = (name: string) => {
-    if (name.includes('Mkazi')) return FileCheck2;
-    if (name.includes('Utambulisho')) return Users2;
-    if (name.includes('Tukio')) return PartyPopper;
-    if (name.includes('Mazishi')) return Skull;
-    if (name.includes('Mauziano')) return Users;
-    if (name.includes('PANGISHA')) return Building2;
-    return FileCheck2;
+  const filteredServices = useMemo(() => {
+    return HARDCODED_SERVICES.filter(s => {
+      const meta = SERVICE_META[s.name];
+      if (activeCategory !== 'all' && meta?.category !== activeCategory) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return s.name.toLowerCase().includes(q) ||
+          (s.name_en || '').toLowerCase().includes(q) ||
+          (s.description || '').toLowerCase().includes(q) ||
+          (s.description_en || '').toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [searchQuery, activeCategory]);
+
+  const getFeeLabel = (service: Service): string => {
+    const meta = SERVICE_META[service.name];
+    if (meta?.feeLabelSw && lang === 'sw') return meta.feeLabelSw;
+    if (meta?.feeLabelEn && lang === 'en') return meta.feeLabelEn;
+    if (service.fee > 0) return formatCurrency(service.fee, displayCurrency);
+    return L('Bure / Kinachobadilika', 'Free / Variable');
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8"
+      className="space-y-5"
     >
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-stone-900">{lang === 'sw' ? 'Huduma Zinazopatikana' : 'Available Services'}</h2>
-          <p className="text-stone-500 font-medium">
-            {lang === 'sw' ? 'Chagua huduma unayoihitaji na ufanye maombi.' : 'Choose the service you need and make an application.'}
-          </p>
-        </div>
-        {onRefresh && (
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl font-semibold text-sm hover:bg-emerald-100 transition-all disabled:opacity-50"
-          >
-            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-            {lang === 'sw' ? 'Onyesha Upya' : 'Refresh'}
-          </button>
-        )}
+      {/* Header */}
+      <div>
+        <h2 className="text-xl sm:text-2xl font-black text-stone-900">
+          {L('Huduma Zinazopatikana', 'Available Services')}
+        </h2>
+        <p className="text-sm text-stone-500 font-medium mt-0.5">
+          {L('Chagua huduma unayoihitaji na ufanye maombi.', 'Choose the service you need and apply.')}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-        {HARDCODED_SERVICES.map(service => {
-          const Icon = getServiceIcon(service.name);
-          return (
-            <div 
-              key={service.id} 
-              className={cn(
-                "bg-white p-6 sm:p-8 rounded-2xl sm:rounded-3xl border border-stone-100 shadow-sm transition-all flex flex-col relative overflow-hidden",
-                user?.is_verified 
-                  ? "hover:shadow-xl hover:border-emerald-500 cursor-pointer group" 
-                  : "opacity-75 cursor-not-allowed"
-              )}
-              onClick={() => user?.is_verified && onSelectService(service)}
-            >
-              <div className="flex justify-between items-start mb-4 sm:mb-6">
-                <div className={cn(
-                  "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-colors",
-                  user?.is_verified ? "bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100" : "bg-stone-100 text-stone-400"
-                )}>
-                  <Icon size={20} className="sm:w-6 sm:h-6" />
+      {/* Search */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"/>
+        <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+          placeholder={L('Tafuta huduma...', 'Search services...')}
+          className="w-full pl-10 pr-4 py-3 border border-stone-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"/>
+      </div>
+
+      {/* Category tabs */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
+        {CATEGORIES.map(cat => (
+          <button key={cat.id} onClick={() => setActiveCategory(cat.id)}
+            className={`px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+              activeCategory === cat.id ? 'bg-stone-800 text-white shadow' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+            }`}>
+            <span>{cat.icon}</span>
+            {lang === 'sw' ? cat.sw : cat.en}
+          </button>
+        ))}
+      </div>
+
+      {/* Verification warning */}
+      {!user?.is_verified && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <Lock size={18} className="text-amber-600 shrink-0 mt-0.5"/>
+          <div>
+            <p className="font-bold text-amber-800 text-sm">{L('Akaunti Yako Haijathibitishwa', 'Your Account is Not Verified')}</p>
+            <p className="text-xs text-amber-700 mt-0.5">{L('Lazima akaunti yako ithibitishwe kabla ya kutumia huduma. Wasiliana na ofisi.', 'Your account must be verified before using services. Contact the office.')}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Service Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        {filteredServices.length === 0 ? (
+          <div className="col-span-2 bg-white rounded-2xl border border-stone-200 p-8 text-center">
+            <p className="text-stone-500 font-bold">{L('Hakuna huduma zinazolingana', 'No matching services')}</p>
+          </div>
+        ) : (
+          filteredServices.map(service => {
+            const meta = SERVICE_META[service.name] || { icon: '📋', category: 'other' };
+            const verified = user?.is_verified;
+            return (
+              <div key={service.id}
+                className={`bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden transition-all flex flex-col ${
+                  verified ? 'hover:shadow-lg hover:border-emerald-400 cursor-pointer group' : 'opacity-75 cursor-not-allowed'
+                }`}
+                onClick={() => verified && onSelectService(service)}
+              >
+                <div className="p-5 flex-1">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="w-11 h-11 rounded-xl bg-stone-100 group-hover:bg-emerald-50 flex items-center justify-center text-xl transition-colors">
+                      {meta.icon}
+                    </div>
+                    <span className="bg-amber-50 text-amber-800 px-2.5 py-1 rounded-full text-[10px] font-bold border border-amber-100 shrink-0">
+                      {getFeeLabel(service)}
+                    </span>
+                  </div>
+                  <h3 className="font-black text-stone-900 text-base leading-snug mb-0.5">
+                    {lang === 'sw' ? service.name : service.name_en || service.name}
+                  </h3>
+                  <p className="text-[10px] text-stone-400 font-medium mb-2">
+                    {lang === 'sw' ? service.name_en || '' : service.name}
+                  </p>
+                  <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">
+                    {lang === 'sw' ? service.description : service.description_en || service.description}
+                  </p>
                 </div>
-                <div className="bg-orange-50 text-orange-800 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-bold border border-orange-100">
-                  {formatCurrency(service.fee, displayCurrency)}
+                <div className="px-5 pb-5">
+                  <button disabled={!verified}
+                    className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                      verified
+                        ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-100 group-hover:scale-[1.01]'
+                        : 'bg-stone-200 text-stone-500'
+                    }`}>
+                    {verified ? (
+                      <>{L('Omba Sasa', 'Apply Now')} <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform"/></>
+                    ) : (
+                      <><Lock size={13}/> {L('Inasubiri Uhakiki', 'Pending Verification')}</>
+                    )}
+                  </button>
                 </div>
               </div>
-              
-              <div className="space-y-1 mb-2 sm:mb-3">
-                <h3 className="font-bold text-lg sm:text-xl text-stone-900 tracking-tight">
-                  {lang === 'sw' ? service.name : service.name_en || service.name}
-                </h3>
-                <p className="text-[10px] sm:text-sm font-medium text-stone-400">
-                  {lang === 'sw' ? service.name_en || 'Service' : service.name}
-                </p>
-              </div>
-              
-              <p className="text-sm sm:text-base text-stone-500 mb-6 sm:mb-8 line-clamp-2 leading-relaxed font-medium">
-                {lang === 'sw' ? service.description : service.description_en || service.description}
-              </p>
-              
-              <div className="mt-auto">
-                <button 
-                  disabled={!user?.is_verified}
-                  className={cn(
-                    "w-full py-3 sm:py-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-lg",
-                    user?.is_verified 
-                      ? "bg-[#2471A3] text-white hover:bg-[#1F618D] shadow-blue-100 group-hover:scale-[1.02]" 
-                      : "bg-stone-200 text-stone-500 shadow-none"
-                  )}
-                >
-                  {user?.is_verified ? (
-                    <>
-                      {lang === 'sw' ? 'Omba Sasa' : 'Apply Now'}
-                      <ArrowRight size={16} className="sm:w-4.5 sm:h-4.5 group-hover:translate-x-1 transition-transform" />
-                    </>
-                  ) : (
-                    <>
-                      <Lock size={16} />
-                      {lang === 'sw' ? 'Inasubiri Uhakiki' : 'Pending Verification'}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </motion.div>
   );
 }
 
-function cn(...classes: (string | undefined | null | false)[]) {
-  return classes.filter(Boolean).join(' ');
-}
+export default Services;
