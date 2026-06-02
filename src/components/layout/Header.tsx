@@ -89,10 +89,22 @@ export function Header({ onMenuClick }: HeaderProps) {
             <p className="text-sm font-bold text-stone-800">
               {user.first_name} {user.last_name}
             </p>
-            <p className="text-xs text-stone-500 capitalize flex items-center gap-2">
+            <p className="text-xs text-stone-500 capitalize flex items-center gap-1.5 justify-end flex-wrap">
               <span>{user.role} {user.is_diaspora && '(Diaspora)'}</span>
-              {(user.seller_id || user.landlord_id) && (
-                <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded font-bold">{user.seller_id ? 'Seller' : 'Landlord'}</span>
+              {user.seller_id && (
+                <span className="text-[9px] bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-2 py-0.5 rounded font-bold shadow-sm">
+                  ✓ {lang === 'sw' ? 'Muuzaji' : 'Seller'}
+                </span>
+              )}
+              {user.landlord_id && (
+                <span className="text-[9px] bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-2 py-0.5 rounded font-bold shadow-sm">
+                  ✓ {lang === 'sw' ? 'Mpangishaji' : 'Landlord'}
+                </span>
+              )}
+              {user.broker_id && (
+                <span className="text-[9px] bg-gradient-to-r from-purple-500 to-fuchsia-600 text-white px-2 py-0.5 rounded font-bold shadow-sm">
+                  ✓ {lang === 'sw' ? 'Dalali' : 'Broker'}
+                </span>
               )}
             </p>
           </div>
