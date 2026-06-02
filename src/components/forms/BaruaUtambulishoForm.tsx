@@ -72,13 +72,23 @@ interface UploadedDoc {
 
 interface FormValues {
   // Step 1 – Applicant
-  ct_id_reference: string;        // optional CT ID from Service 1
-  has_resident_id: string;        // YES / NO / PENDING
+  application_type: string;       // SELF / MINOR / BEHALF
+  ct_id_reference: string;
+  has_resident_id: string;
+  // Minor details
+  minor_full_name: string;
+  minor_dob: string;
+  minor_relationship: string;
+  minor_nida: string;
+  // On-behalf details
+  behalf_full_name: string;
+  behalf_nida: string;
+  behalf_phone: string;
+  behalf_relationship: string;
   // Step 2 – Purpose
   purpose: string;
-  purpose_details: string;        // required when NYINGINEZO
-  urgency: string;                // NORMAL / URGENT
-  // Step 4 – Docs optional
+  purpose_details: string;
+  urgency: string;
   // Step 5 – Consent
   terms_accepted: boolean;
   data_confirmed: boolean;
@@ -109,8 +119,11 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
   const [docErr, setDocErr] = useState('');
 
   const [vals, setVals] = useState<FormValues>({
+    application_type: 'SELF',
     ct_id_reference: (userProfile as any)?.citizen_id || '',
     has_resident_id: (userProfile as any)?.citizen_id ? 'YES' : '',
+    minor_full_name: '', minor_dob: '', minor_relationship: '', minor_nida: '',
+    behalf_full_name: '', behalf_nida: '', behalf_phone: '', behalf_relationship: '',
     purpose: '',
     purpose_details: '',
     urgency: 'NORMAL',
@@ -170,6 +183,19 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
   const validate = (): boolean => {
     const e: Record<string, string> = {};
 
+    if (step === 'applicant') {
+      if (vals.application_type === 'MINOR') {
+        if (!vals.minor_full_name.trim()) e.minor_full_name = L('Jina la mtoto linahitajika', 'Child\'s name required');
+        if (!vals.minor_dob) e.minor_dob = L('Tarehe ya kuzaliwa inahitajika', 'Date of birth required');
+        if (!vals.minor_relationship.trim()) e.minor_relationship = L('Uhusiano unahitajika', 'Relationship required');
+      }
+      if (vals.application_type === 'BEHALF') {
+        if (!vals.behalf_full_name.trim()) e.behalf_full_name = L('Jina la mtu linahitajika', 'Person\'s name required');
+        if (!vals.behalf_phone.trim()) e.behalf_phone = L('Simu inahitajika', 'Phone number required');
+        if (!vals.behalf_relationship.trim()) e.behalf_relationship = L('Uhusiano unahitajika', 'Relationship required');
+      }
+    }
+
     if (step === 'purpose') {
       if (!vals.purpose) e.purpose = L('Chagua sababu ya maombi', 'Select purpose of application');
       if (vals.purpose === 'NYINGINEZO' && !vals.purpose_details.trim())
@@ -208,6 +234,9 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
         service_name: 'Barua ya Utambulisho',
         application_reference: ref,
         document_count: docs.length,
+        beneficiary_name: vals.application_type === 'MINOR'  ? vals.minor_full_name
+          : vals.application_type === 'BEHALF' ? vals.behalf_full_name
+          : `${userProfile?.first_name || ''} ${userProfile?.last_name || ''}`.trim(),
       };
       await onSubmit(payload, files);
       setAppRef(ref);
@@ -333,6 +362,10 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
           <div className="space-y-2 pt-2 border-t border-emerald-200">
             {[
               [L('Huduma', 'Service'), L('Barua ya Utambulisho', 'Introduction Letter')],
+              [L('Barua kwa Jina la', 'Letter in Name of'),
+                vals.application_type === 'MINOR'  ? vals.minor_full_name
+                : vals.application_type === 'BEHALF' ? vals.behalf_full_name
+                : `${userProfile?.first_name || ''} ${userProfile?.last_name || ''}`.trim()],
               [L('Idadi ya Taasisi', 'Institutions'), String(institutions.length)],
               [L('Ada ya Jumla', 'Total Fee'), fmtFee(totalFee)],
               [L('Tarehe', 'Date'), new Date().toLocaleDateString(lang === 'sw' ? 'sw-TZ' : 'en-US')],
@@ -380,47 +413,193 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
               <User size={16}/> {L('TAARIFA ZA MUOMBAJI', 'APPLICANT INFORMATION')}
             </p>
             <p className="text-xs text-emerald-600 mt-0.5">
-              {L('Taarifa zako zimechukuliwa kutoka kwenye wasifu wako',
-                 'Your details are taken from your profile')}
+              {L('Barua hii inaombwa kwa ajili ya nani?', 'Who is this letter being applied for?')}
             </p>
           </div>
 
-          {/* Profile read-only card */}
-          {userProfile ? (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle size={15} className="text-emerald-600"/>
-                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">
-                  {L('Taarifa za Wasifu (Hazibadilishwi)', 'Profile Details (Read-only)')}
+          {/* ── Application type selector ── */}
+          <Field name="application_type" label={L('Aina ya Maombi', 'Application Type')} required>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'SELF',   icon: '👤', sw: 'Mwenyewe',    en: 'Self',         sw2: 'Wewe mwenyewe',          en2: 'For yourself' },
+                { value: 'MINOR',  icon: '👶', sw: 'Mtoto/Mdogo', en: 'Minor',        sw2: 'Mtoto wako (<18)',        en2: 'Your child (<18)' },
+                { value: 'BEHALF', icon: '🤝', sw: 'Kwa Niaba',   en: 'On Behalf',    sw2: 'Msaada kwa mtu mwingine', en2: 'Helping another citizen' },
+              ].map(opt => (
+                <button key={opt.value} type="button"
+                  onClick={() => { set('application_type', opt.value); clrErr('application_type'); }}
+                  className={`py-3 px-2 rounded-xl border-2 text-center transition-all flex flex-col items-center gap-1 ${
+                    vals.application_type === opt.value
+                      ? 'bg-emerald-50 border-emerald-500'
+                      : 'bg-white border-stone-200 hover:border-stone-300'}`}>
+                  <span className="text-xl">{opt.icon}</span>
+                  <span className={`text-xs font-black ${vals.application_type === opt.value ? 'text-emerald-700' : 'text-stone-600'}`}>
+                    {lang === 'sw' ? opt.sw : opt.en}
+                  </span>
+                  <span className={`text-[9px] leading-tight ${vals.application_type === opt.value ? 'text-emerald-600' : 'text-stone-400'}`}>
+                    {lang === 'sw' ? opt.sw2 : opt.en2}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {/* ── SELF: show profile card ── */}
+          {vals.application_type === 'SELF' && (
+            <>
+              {userProfile ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle size={15} className="text-emerald-600"/>
+                    <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">
+                      {L('Taarifa za Wasifu (Hazibadilishwi)', 'Profile Details (Read-only)')}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      [L('Jina Kamili', 'Full Name'), `${userProfile.first_name || ''} ${userProfile.middle_name || ''} ${userProfile.last_name || ''}`.trim()],
+                      ['NIDA', userProfile.nida_number || '—'],
+                      [L('Simu', 'Phone'), userProfile.phone || '—'],
+                      ['Email', userProfile.email || '—'],
+                      [L('Mkoa', 'Region'), userProfile.region || '—'],
+                      [L('Wilaya/Kata', 'District/Ward'), `${userProfile.district || ''} / ${userProfile.ward || ''}`.replace(/^ \/ $/, '—')],
+                    ].map(([l, v]) => (
+                      <div key={String(l)} className="bg-white rounded-lg px-3 py-2">
+                        <p className="text-[9px] text-stone-400 uppercase tracking-wide">{l}</p>
+                        <p className="text-xs font-bold text-stone-800 truncate">{v}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+                  <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5"/>
+                  <p className="text-sm text-amber-700">
+                    {L('Wasifu wako haukupatikana. Taarifa zako zitahitajika kujaza kwa mkono.',
+                       'Your profile was not found. Your details will need to be entered manually.')}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── MINOR: child details ── */}
+          {vals.application_type === 'MINOR' && (
+            <div className="border border-blue-200 rounded-xl overflow-hidden">
+              <div className="bg-blue-50 px-4 py-2.5 border-b border-blue-100 flex items-center gap-2">
+                <span className="text-base">👶</span>
+                <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">
+                  {L('TAARIFA ZA MTOTO / MDOGO', 'MINOR\'S DETAILS')}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  [L('Jina Kamili', 'Full Name'), `${userProfile.first_name || ''} ${userProfile.middle_name || ''} ${userProfile.last_name || ''}`.trim()],
-                  ['NIDA', userProfile.nida_number || '—'],
-                  [L('Simu', 'Phone'), userProfile.phone || '—'],
-                  ['Email', userProfile.email || '—'],
-                  [L('Mkoa', 'Region'), userProfile.region || '—'],
-                  [L('Wilaya/Kata', 'District/Ward'), `${userProfile.district || ''} / ${userProfile.ward || ''}`.replace(/^ \/ $/, '—')],
-                ].map(([l, v]) => (
-                  <div key={String(l)} className="bg-white rounded-lg px-3 py-2">
-                    <p className="text-[9px] text-stone-400 uppercase tracking-wide">{l}</p>
-                    <p className="text-xs font-bold text-stone-800 truncate">{v}</p>
+              <div className="p-4 space-y-4">
+                <div className="bg-blue-50 rounded-xl p-3 flex gap-2">
+                  <Info size={13} className="text-blue-500 shrink-0 mt-0.5"/>
+                  <p className="text-xs text-blue-700">
+                    {L('Wewe (mlezi/mzazi) ndiyo muombaji mkuu. Barua itatolewa kwa jina la mtoto.',
+                       'You (guardian/parent) are the main applicant. The letter will be issued in the child\'s name.')}
+                  </p>
+                </div>
+
+                <Field name="minor_full_name" label={L('Jina Kamili la Mtoto', 'Child\'s Full Name')} required>
+                  <TI name="minor_full_name" value={vals.minor_full_name}
+                    onChange={v => { set('minor_full_name', v); clrErr('minor_full_name'); }}
+                    placeholder={L('Jina kamili la mtoto', 'Child\'s full name')} />
+                </Field>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field name="minor_dob" label={L('Tarehe ya Kuzaliwa', 'Date of Birth')} required>
+                    <TI name="minor_dob" value={vals.minor_dob} type="date"
+                      onChange={v => { set('minor_dob', v); clrErr('minor_dob'); }} />
+                  </Field>
+                  <Field name="minor_nida" label={L('NIDA ya Mtoto (Hiari)', 'Child\'s NIDA (Optional)')}>
+                    <TI name="minor_nida" value={vals.minor_nida}
+                      onChange={v => set('minor_nida', v)}
+                      placeholder={L('Kama ana', 'If available')} />
+                  </Field>
+                </div>
+
+                <Field name="minor_relationship" label={L('Uhusiano Wako na Mtoto', 'Your Relationship to the Child')} required
+                  hint={L('Mfano: Baba, Mama, Mlezi, Ndugu', 'E.g. Father, Mother, Guardian, Sibling')}>
+                  <TI name="minor_relationship" value={vals.minor_relationship}
+                    onChange={v => { set('minor_relationship', v); clrErr('minor_relationship'); }}
+                    placeholder={L('Mfano: Baba / Mama / Mlezi', 'E.g. Father / Mother / Guardian')} />
+                </Field>
+
+                {/* Applicant's own profile reminder */}
+                {userProfile && (
+                  <div className="bg-stone-50 border border-stone-100 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">
+                      {L('Mlezi / Mzazi (Wewe)', 'Guardian / Parent (You)')}
+                    </p>
+                    <p className="text-xs font-bold text-stone-700">
+                      {`${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim()} · {userProfile.phone || '—'}
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-          ) : (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
-              <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5"/>
-              <p className="text-sm text-amber-700">
-                {L('Wasifu wako haukupatikana. Taarifa zako zitahitajika kujaza kwa mkono.',
-                   'Your profile was not found. Your details will need to be entered manually.')}
-              </p>
             </div>
           )}
 
-          {/* Resident Identity reference */}
+          {/* ── ON BEHALF: other citizen's details ── */}
+          {vals.application_type === 'BEHALF' && (
+            <div className="border border-amber-200 rounded-xl overflow-hidden">
+              <div className="bg-amber-50 px-4 py-2.5 border-b border-amber-100 flex items-center gap-2">
+                <span className="text-base">🤝</span>
+                <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">
+                  {L('TAARIFA ZA MTU UNAYEMSAIDIA', 'DETAILS OF PERSON BEING HELPED')}
+                </span>
+              </div>
+              <div className="p-4 space-y-4">
+                <div className="bg-amber-50 rounded-xl p-3 flex gap-2">
+                  <Info size={13} className="text-amber-500 shrink-0 mt-0.5"/>
+                  <p className="text-xs text-amber-700">
+                    {L('Wewe unasaidia raia mwingine. Barua itatolewa kwa jina lake. Taarifa zako (msaidizi) zitaandikwa pia.',
+                       'You are helping another citizen. The letter will be in their name. Your details (helper) will also be recorded.')}
+                  </p>
+                </div>
+
+                <Field name="behalf_full_name" label={L('Jina Kamili la Mtu Unayemsaidia', 'Full Name of Person Being Helped')} required>
+                  <TI name="behalf_full_name" value={vals.behalf_full_name}
+                    onChange={v => { set('behalf_full_name', v); clrErr('behalf_full_name'); }}
+                    placeholder={L('Jina kamili', 'Full name')} />
+                </Field>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field name="behalf_nida" label={L('NIDA yake (Hiari)', 'Their NIDA (Optional)')}>
+                    <TI name="behalf_nida" value={vals.behalf_nida}
+                      onChange={v => set('behalf_nida', v)}
+                      placeholder="XXXX-XXXX-XXXX" />
+                  </Field>
+                  <Field name="behalf_phone" label={L('Simu yake', 'Their Phone Number')} required>
+                    <TI name="behalf_phone" value={vals.behalf_phone}
+                      onChange={v => { set('behalf_phone', v); clrErr('behalf_phone'); }}
+                      placeholder="+255 7XX XXX XXX" />
+                  </Field>
+                </div>
+
+                <Field name="behalf_relationship" label={L('Uhusiano Wako Naye', 'Your Relationship to Them')} required
+                  hint={L('Mfano: Ndugu, Jirani, Rafiki, Wakili', 'E.g. Relative, Neighbour, Friend, Legal Representative')}>
+                  <TI name="behalf_relationship" value={vals.behalf_relationship}
+                    onChange={v => { set('behalf_relationship', v); clrErr('behalf_relationship'); }}
+                    placeholder={L('Mfano: Kaka / Jirani / Wakili', 'E.g. Brother / Neighbour / Legal Rep')} />
+                </Field>
+
+                {/* Helper's own profile */}
+                {userProfile && (
+                  <div className="bg-stone-50 border border-stone-100 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">
+                      {L('Msaidizi (Wewe)', 'Helper (You)')}
+                    </p>
+                    <p className="text-xs font-bold text-stone-700">
+                      {`${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim()} · {userProfile.phone || '—'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── CT ID reference (all types) ── */}
           <div className="border border-stone-200 rounded-xl overflow-hidden">
             <div className="bg-stone-50 px-4 py-2.5 border-b border-stone-100 flex items-center gap-2">
               <CreditCard size={14} className="text-stone-600"/>
@@ -430,21 +609,25 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
             </div>
             <div className="p-4 space-y-4">
               <Field name="has_resident_id"
-                label={L('Je, una Utambulisho wa Mkazi (CT ID)?', 'Do you have a Resident Identity (CT ID)?')}
+                label={
+                  vals.application_type === 'MINOR'
+                    ? L('Je, mtoto ana Utambulisho wa Mkazi (CT ID)?', 'Does the child have a Resident Identity (CT ID)?')
+                    : vals.application_type === 'BEHALF'
+                    ? L('Je, mtu huyu ana Utambulisho wa Mkazi (CT ID)?', 'Does this person have a Resident Identity (CT ID)?')
+                    : L('Je, una Utambulisho wa Mkazi (CT ID)?', 'Do you have a Resident Identity (CT ID)?')
+                }
                 hint={L('Kupata kutoka Huduma ya "Utambulisho wa Mkazi"', 'Obtained from the "Resident Identity" service')}>
                 <Sel name="has_resident_id" value={vals.has_resident_id}
                   onChange={v => { set('has_resident_id', v); if (v !== 'YES') set('ct_id_reference', ''); clrErr('has_resident_id'); }}
                   options={[
-                    { label: L('Ndiyo — Nina CT ID', 'Yes — I have a CT ID'), value: 'YES' },
-                    { label: L('Hapana — Sina CT ID', 'No — I do not have a CT ID'), value: 'NO' },
-                    { label: L('Inasubiri — Maombi yangu yako njiani', 'Pending — My application is in progress'), value: 'PENDING' },
+                    { label: L('Ndiyo — Nina CT ID', 'Yes — Has a CT ID'), value: 'YES' },
+                    { label: L('Hapana — Hana CT ID', 'No — Does not have a CT ID'), value: 'NO' },
+                    { label: L('Inasubiri — Maombi yako njiani', 'Pending — Application in progress'), value: 'PENDING' },
                   ]} />
               </Field>
 
               {vals.has_resident_id === 'YES' && (
-                <Field name="ct_id_reference"
-                  label={L('Namba ya CT ID', 'CT ID Number')}
-                  hint={L('Mfano: CT2026A00001', 'E.g. CT2026A00001')}>
+                <Field name="ct_id_reference" label={L('Namba ya CT ID', 'CT ID Number')} hint={L('Mfano: CT2026A00001', 'E.g. CT2026A00001')}>
                   <TI name="ct_id_reference" value={vals.ct_id_reference}
                     onChange={v => set('ct_id_reference', v.toUpperCase())}
                     placeholder="CT2026A00001" />
@@ -456,7 +639,7 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
                   <Info size={14} className="text-blue-500 shrink-0 mt-0.5"/>
                   <p className="text-xs text-blue-700">
                     {L('Unaweza bado kuomba Barua ya Utambulisho. Hata hivyo, kupata Utambulisho wa Mkazi kwanza kutasaidia kupata barua haraka na kwa urahisi zaidi.',
-                       'You can still apply for an Introduction Letter. However, getting a Resident Identity first will make the process faster and easier.')}
+                       'You can still apply. However, getting a Resident Identity first will make the process faster and easier.')}
                   </p>
                 </div>
               )}
@@ -465,8 +648,8 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex gap-2">
                   <AlertCircle size={14} className="text-amber-500 shrink-0 mt-0.5"/>
                   <p className="text-xs text-amber-700">
-                    {L('Maombi yako ya Utambulisho wa Mkazi yakikamilika, taarifa zako zitahuishwa kiotomatiki.',
-                       'Once your Resident Identity application is completed, your details will be automatically updated.')}
+                    {L('Maombi ya Utambulisho wa Mkazi yakikamilika, taarifa zitahuishwa kiotomatiki.',
+                       'Once the Resident Identity application completes, details will be automatically updated.')}
                   </p>
                 </div>
               )}
@@ -832,13 +1015,30 @@ export const BaruaUtambulishoForm: React.FC<FormProps> = ({
 
           {/* Applicant */}
           <PSection icon={<User size={14}/>} title={L('Muombaji', 'Applicant')} stepKey="applicant">
-            <PRow label={L('Jina Kamili', 'Full Name')}
-              value={`${userProfile?.first_name || ''} ${userProfile?.middle_name || ''} ${userProfile?.last_name || ''}`.trim()} />
-            <PRow label="NIDA" value={userProfile?.nida_number} />
+            <PRow label={L('Aina ya Maombi', 'Application Type')}
+              value={vals.application_type === 'SELF' ? L('Mwenyewe', 'Self')
+                : vals.application_type === 'MINOR' ? L('Mtoto/Mdogo', 'Minor')
+                : L('Kwa Niaba', 'On Behalf')} />
+            <PRow label={L('Muombaji (Wewe)', 'Applicant (You)')}
+              value={`${userProfile?.first_name || ''} ${userProfile?.last_name || ''}`.trim()} />
             <PRow label={L('Simu', 'Phone')} value={userProfile?.phone} />
-            <PRow label="Email" value={userProfile?.email} />
+            <PRow label="NIDA" value={userProfile?.nida_number} />
             <PRow label={L('Mkoa / Wilaya', 'Region / District')} value={`${userProfile?.region || ''} / ${userProfile?.district || ''}`.replace(/^ \/ $/, '—')} />
             <PRow label="CT ID" value={vals.ct_id_reference || (vals.has_resident_id === 'NO' ? L('Hana', 'None') : vals.has_resident_id === 'PENDING' ? L('Inasubiri', 'Pending') : '—')} />
+            {vals.application_type === 'MINOR' && <>
+              <p className="col-span-2 text-[10px] font-black text-stone-400 uppercase tracking-widest pt-1">{L('MTOTO / MDOGO', 'MINOR')}</p>
+              <PRow label={L('Jina la Mtoto', 'Child\'s Name')} value={vals.minor_full_name} />
+              <PRow label={L('Tarehe ya Kuzaliwa', 'Date of Birth')} value={vals.minor_dob} />
+              <PRow label={L('Uhusiano', 'Relationship')} value={vals.minor_relationship} />
+              {vals.minor_nida && <PRow label={L('NIDA ya Mtoto', 'Child\'s NIDA')} value={vals.minor_nida} />}
+            </>}
+            {vals.application_type === 'BEHALF' && <>
+              <p className="col-span-2 text-[10px] font-black text-stone-400 uppercase tracking-widest pt-1">{L('MTU ANAYESAIDIWA', 'PERSON BEING HELPED')}</p>
+              <PRow label={L('Jina', 'Name')} value={vals.behalf_full_name} />
+              <PRow label={L('Simu', 'Phone')} value={vals.behalf_phone} />
+              {vals.behalf_nida && <PRow label="NIDA" value={vals.behalf_nida} />}
+              <PRow label={L('Uhusiano', 'Relationship')} value={vals.behalf_relationship} />
+            </>}
           </PSection>
 
           {/* Purpose */}
