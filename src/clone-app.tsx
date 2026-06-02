@@ -24,6 +24,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Services } from './pages/Services';
 import { Apply } from './pages/Apply';
 import { Applications } from './pages/Applications';
+import { Agreement } from './pages/Agreement';
 import { Profile } from './pages/Profile';
 import { Auth } from './pages/Auth';
 import { VerifyDocuments } from './components/VerifyDocuments';
