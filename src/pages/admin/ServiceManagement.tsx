@@ -80,109 +80,69 @@ interface DemoService extends Service {
 }
 
 const DEMO_SERVICES: DemoService[] = [
-  { 
-    id: 'demo-1', 
-    name: 'Birth Certificate',
-    name_en: 'Birth Certificate',
-    name_sw: 'Cheti cha Kuzaliwa',
-    description: 'Application for birth certificate',
-    description_en: 'Application for birth certificate',
-    description_sw: 'Maombi ya cheti cha kuzaliwa',
-    fee: 5000,
-    currency: 'TZS',
-    active: true,
-    processing_time: 3,
-    category: 'civil_registration',
-    required_documents: ['nida', 'parent_id'],
-    form_schema: [
-      {
-        id: 'full_name',
-        type: 'text',
-        label: 'Full Name',
-        label_en: 'Full Name',
-        label_sw: 'Jina Kamili',
-        required: true
-      },
-      {
-        id: 'date_of_birth',
-        type: 'date',
-        label: 'Date of Birth',
-        label_en: 'Date of Birth',
-        label_sw: 'Tarehe ya Kuzaliwa',
-        required: true
-      }
-    ]
+  {
+    id: '1', name: 'Utambulisho wa Mkazi', name_en: 'Resident Identity', name_sw: 'Utambulisho wa Mkazi',
+    description: 'Cheti rasmi cha utambulisho wa mkazi wa mtaa', description_en: 'Official resident identity certificate',
+    description_sw: 'Cheti rasmi cha utambulisho wa mkazi wa mtaa',
+    fee: 5000, currency: 'TZS', active: true, processing_time: 3, category: 'identification',
+    required_documents: ['nida', 'selfie', 'proof_of_residence'], form_schema: [], isDemo: true
   },
-  { 
-    id: 'demo-2', 
-    name: 'ID Card',
-    name_en: 'ID Card',
-    name_sw: 'Kitambulisho',
-    description: 'National ID card issuance',
-    description_en: 'National ID card issuance',
-    description_sw: 'Utoaji wa kitambulisho cha taifa',
-    fee: 10000,
-    currency: 'TZS',
-    active: true,
-    processing_time: 5,
-    category: 'identification',
-    required_documents: ['birth_certificate', 'photo'],
-    form_schema: [
-      {
-        id: 'full_name',
-        type: 'text',
-        label: 'Full Name',
-        label_en: 'Full Name',
-        label_sw: 'Jina Kamili',
-        required: true
-      },
-      {
-        id: 'nida_number',
-        type: 'text',
-        label: 'NIDA Number',
-        label_en: 'NIDA Number',
-        label_sw: 'Namba ya NIDA',
-        required: true,
-        validation: {
-          pattern: '^[0-9]{20}$'
-        }
-      }
-    ]
+  {
+    id: '2', name: 'Kibari cha Mazishi', name_en: 'Burial Permit', name_sw: 'Kibari cha Mazishi',
+    description: 'Kibari rasmi cha kuzika marehemu', description_en: 'Official burial permit',
+    description_sw: 'Kibari rasmi cha kuzika marehemu',
+    fee: 2000, currency: 'TZS', active: true, processing_time: 1, category: 'permits',
+    required_documents: ['death_certificate', 'id'], form_schema: [], isDemo: true
   },
-  { 
-    id: 'demo-3', 
-    name: 'Passport',
-    name_en: 'Passport',
-    name_sw: 'Pasipoti',
-    description: 'Passport application',
-    description_en: 'Passport application',
-    description_sw: 'Maombi ya pasipoti',
-    fee: 50000,
-    currency: 'TZS',
-    active: true,
-    processing_time: 10,
-    category: 'travel_documents',
-    required_documents: ['birth_certificate', 'nida', 'photo', 'parent_consent'],
-    form_schema: [
-      {
-        id: 'full_name',
-        type: 'text',
-        label: 'Full Name',
-        label_en: 'Full Name',
-        label_sw: 'Jina Kamili',
-        required: true
-      },
-      {
-        id: 'passport_type',
-        type: 'select',
-        label: 'Passport Type',
-        label_en: 'Passport Type',
-        label_sw: 'Aina ya Pasipoti',
-        required: true,
-        options: ['Ordinary', 'Official', 'Diplomatic']
-      }
-    ]
-  }
+  {
+    id: '3', name: 'Kibari cha Sherehe', name_en: 'Celebration Permit', name_sw: 'Kibari cha Sherehe',
+    description: 'Kibari cha kufanya sherehe au matukio', description_en: 'Event / celebration permit',
+    description_sw: 'Kibari cha kufanya sherehe au matukio',
+    fee: 10000, currency: 'TZS', active: true, processing_time: 3, category: 'permits',
+    required_documents: ['venue_approval'], form_schema: [], isDemo: true
+  },
+  {
+    id: '4', name: 'Kibari cha Ujezi Mdogo', name_en: 'Minor Construction Permit', name_sw: 'Kibari cha Ujezi Mdogo',
+    description: 'Kibari cha ujenzi mdogo wa nyumba au ardhi', description_en: 'Minor construction permit',
+    description_sw: 'Kibari cha ujenzi mdogo wa nyumba au ardhi',
+    fee: 15000, currency: 'TZS', active: true, processing_time: 5, category: 'permits',
+    required_documents: ['land_cert', 'sketch', 'id'], form_schema: [], isDemo: true
+  },
+  {
+    id: '5', name: 'Barua ya Utambulisho', name_en: 'Introduction Letter', name_sw: 'Barua ya Utambulisho',
+    description: 'Barua ya utambulisho kwa taasisi mbalimbali', description_en: 'Introduction letter for institutions',
+    description_sw: 'Barua ya utambulisho kwa taasisi mbalimbali',
+    fee: 3000, currency: 'TZS', active: true, processing_time: 2, category: 'certificates',
+    required_documents: ['id'], form_schema: [], isDemo: true
+  },
+  {
+    id: '6', name: 'Makubaliano ya Mauzo', name_en: 'Sales Agreement', name_sw: 'Makubaliano ya Mauzo',
+    description: 'Makubaliano rasmi ya mauzo ya mali', description_en: 'Official sales agreement',
+    description_sw: 'Makubaliano rasmi ya mauzo ya mali',
+    fee: 0, currency: 'TZS', active: true, processing_time: 5, category: 'agreements',
+    required_documents: ['title_deed', 'id', 'buyer_id'], form_schema: [], isDemo: true
+  },
+  {
+    id: '7', name: 'Makubaliano ya Pango', name_en: 'Rental Agreement', name_sw: 'Makubaliano ya Pango',
+    description: 'Mkataba rasmi wa kukodisha nyumba', description_en: 'Official rental agreement',
+    description_sw: 'Mkataba rasmi wa kukodisha nyumba',
+    fee: 10000, currency: 'TZS', active: true, processing_time: 3, category: 'agreements',
+    required_documents: ['ownership_cert', 'id', 'tenant_id'], form_schema: [], isDemo: true
+  },
+  {
+    id: '8', name: 'Malipo na Michango', name_en: 'Payments & Contributions', name_sw: 'Malipo na Michango',
+    description: 'Lipa faini, ada ya usafi, michango', description_en: 'Pay fines, fees, and contributions',
+    description_sw: 'Lipa faini, ada ya usafi, michango',
+    fee: 0, currency: 'TZS', active: true, processing_time: 1, category: 'payments',
+    required_documents: [], form_schema: [], isDemo: true
+  },
+  {
+    id: '9', name: 'Migogoro na Mashauri', name_en: 'Disputes & Issues', name_sw: 'Migogoro na Mashauri',
+    description: 'Wasilisha mgogoro au ripoti tatizo la kijamii', description_en: 'File disputes or report community issues',
+    description_sw: 'Wasilisha mgogoro au ripoti tatizo la kijamii',
+    fee: 5000, currency: 'TZS', active: true, processing_time: 7, category: 'civil_registration',
+    required_documents: ['id', 'evidence'], form_schema: [], isDemo: true
+  },
 ];
 
 const INITIAL_FORM_DATA: ServiceFormData = {
@@ -200,11 +160,12 @@ const INITIAL_FORM_DATA: ServiceFormData = {
 };
 
 const SERVICE_CATEGORIES = [
-  { id: 'civil_registration', en: 'Civil Registration', sw: 'Usajili wa Kiraia' },
   { id: 'identification', en: 'Identification', sw: 'Utambulisho' },
-  { id: 'travel_documents', en: 'Travel Documents', sw: 'Nyaraka za Usafiri' },
   { id: 'permits', en: 'Permits', sw: 'Vibali' },
-  { id: 'certificates', en: 'Certificates', sw: 'Vyeti' },
+  { id: 'certificates', en: 'Letters & Certificates', sw: 'Barua na Vyeti' },
+  { id: 'agreements', en: 'Agreements & Contracts', sw: 'Makubaliano na Mikataba' },
+  { id: 'payments', en: 'Payments & Contributions', sw: 'Malipo na Michango' },
+  { id: 'civil_registration', en: 'Disputes & Civil Registration', sw: 'Migogoro na Usajili' },
   { id: 'general', en: 'General Services', sw: 'Huduma za Jumla' },
 ];
 

@@ -109,21 +109,21 @@ export function MobileNav({ isOpen, onClose, currentView, setView }: MobileNavPr
       id: 'application_review',
       icon: <Search size={20} />,
       label: lang === 'sw' ? 'Uhakiki wa Maombi' : 'Application Review',
-      roles: ['staff'],
+      roles: ['staff', 'admin'],
       view: 'application_review'
     },
     {
       id: 'customer_support',
       icon: <HelpCircle size={20} />,
       label: lang === 'sw' ? 'Huduma kwa Wateja' : 'Customer Support',
-      roles: ['staff'],
+      roles: ['staff', 'admin'],
       view: 'customer_support'
     },
     {
       id: 'manual_verification',
       icon: <UserCheck size={20} />,
       label: lang === 'sw' ? 'Uhakiki wa Mwongozo' : 'Manual Verification',
-      roles: ['staff'],
+      roles: ['staff', 'admin'],
       view: 'manual_verification'
     },
     {

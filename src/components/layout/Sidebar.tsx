@@ -124,6 +124,12 @@ export function Sidebar({ currentView, setView }: SidebarProps) {
             onClick={() => setView('staff_management')} 
           />
           <SidebarItem 
+            icon={<Eye size={20} />} 
+            label={lang === 'sw' ? 'Kagua Maombi' : 'Application Review'} 
+            active={currentView === 'application_review'} 
+            onClick={() => setView('application_review')} 
+          />
+          <SidebarItem 
             icon={<Users size={20} />} 
             label={lang === 'sw' ? 'Usimamizi wa Wananchi' : 'Citizen Management'} 
             active={currentView === 'citizen_management'} 

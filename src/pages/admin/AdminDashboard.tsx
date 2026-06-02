@@ -23,7 +23,8 @@ import {
   Laptop,
   BarChart3,
   PieChart,
-  Percent
+  Percent,
+  ClipboardCheck
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { StatCard } from '@/components/ui/StatCard';
@@ -870,7 +871,32 @@ export function AdminDashboard({ setView }: { setView?: (view: string) => void }
                 <Zap size={20} className="text-emerald-400" />
                 {lang === 'sw' ? 'Vitendo vya Haraka' : 'Quick Actions'}
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <button 
+                  onClick={() => setView?.('application_review')}
+                  className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 hover:bg-white/20 transition-all text-left relative"
+                >
+                  <ClipboardCheck size={24} className="text-emerald-400 mb-2" />
+                  <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-1">
+                    {lang === 'sw' ? 'Maombi' : 'Applications'}
+                  </p>
+                  <p className="text-sm font-bold">{lang === 'sw' ? 'Kagua Maombi' : 'Review Applications'}</p>
+                  {stats.pendingApplications > 0 && (
+                    <span className="absolute top-2 right-2 bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg animate-pulse">
+                      {stats.pendingApplications}
+                    </span>
+                  )}
+                </button>
+                <button 
+                  onClick={() => setView?.('business_approval')}
+                  className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 hover:bg-white/20 transition-all text-left relative"
+                >
+                  <Building2 size={24} className="text-purple-400 mb-2" />
+                  <p className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-1">
+                    {lang === 'sw' ? 'Biashara' : 'Business'}
+                  </p>
+                  <p className="text-sm font-bold">{lang === 'sw' ? 'Idhini ya Biashara' : 'Business Approval'}</p>
+                </button>
                 <button 
                   onClick={() => setView?.('service_management')}
                   className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 hover:bg-white/20 transition-all text-left"
