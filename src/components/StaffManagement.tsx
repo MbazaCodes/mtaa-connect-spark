@@ -30,6 +30,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Language, useTranslation } from '@/lib/i18n';
 import { useToast } from '@/context/ToastContext';
+import { useAuth } from '@/context/AuthContext';
 import { INITIAL_SERVICES } from '@/constants/services';
 
 interface StaffManagementProps {
@@ -39,6 +40,7 @@ interface StaffManagementProps {
 export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
   const t = useTranslation(lang);
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [staff, setStaff] = useState<UserProfile[]>([]);
   const [offices, setOffices] = useState<VirtualOffice[]>([]);
   const [loading, setLoading] = useState(true);
