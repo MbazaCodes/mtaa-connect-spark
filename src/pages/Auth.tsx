@@ -133,34 +133,36 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
 
     setLoading(true);
     try {
-      // --- Fast-fail if .env wasn't loaded (avoids confusing 20s timeout) ---
+      // --- Fast-fail if backend env wasn't loaded (avoids confusing 20s timeout) ---
       const cfgUrl = import.meta.env.VITE_SUPABASE_URL;
-      const cfgKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const cfgKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
       if (!cfgUrl || !cfgKey || cfgUrl.includes('placeholder')) {
         throw new Error(
           lang === 'sw'
-            ? 'Mfumo haujasanidiwa: faili ya .env haijapakiwa. Hakikisha .env ina VITE_SUPABASE_URL na VITE_SUPABASE_ANON_KEY, kisha anzisha upya seva (Ctrl+C, npm run dev).'
-            : 'Not configured: .env was not loaded. Ensure .env has VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then FULLY restart the dev server (Ctrl+C, npm run dev).'
+            ? 'Mfumo haujasanidiwa. Tafadhali hakikisha mipangilio ya backend imewekwa, kisha jaribu tena.'
+            : 'Backend is not configured. Please check the backend settings and try again.'
         );
       }
 
-      // --- Auth call with 20 s timeout — no preflight request needed ---
+      // --- Auth call with a guarded timeout — always clear it after a response ---
       const unreachableError = new Error(
         lang === 'sw'
-          ? 'Seva ya Supabase haipatikani. Mradi wako unaweza kuwa umesimamishwa — tembelea dashibodi ya Supabase kuuanzisha tena, au angalia muunganisho wa intaneti yako.'
-          : 'Cannot reach Supabase server. Your project may be paused — visit app.supabase.com to resume it, or check your internet connection.'
+          ? 'Huduma ya kuingia haikujibu kwa wakati. Tafadhali jaribu tena.'
+          : 'The sign-in service did not respond in time. Please try again.'
       );
       (unreachableError as any).__isTimeout = true;
 
+      let loginTimeoutId: ReturnType<typeof setTimeout> | undefined;
       const { data, error } = await Promise.race([
         supabase.auth.signInWithPassword({ email, password }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => {
-            console.error('[Auth Debug] TIMEOUT: 20s exceeded');
+          loginTimeoutId = setTimeout(() => {
             reject(unreachableError);
           }, 20000)
         ),
-      ]);
+      ]).finally(() => {
+        if (loginTimeoutId) clearTimeout(loginTimeoutId);
+      });
 
       // --- Handle auth response ---
 
@@ -302,13 +304,11 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
         || _e.message?.includes('NetworkError')
         || _e.message?.includes('ERR_NAME_NOT_RESOLVED');
       
-      console.log('[Auth Debug] isTimeout:', isTimeout, 'isNetworkError:', isNetworkError);
-      
       if (isNetworkError) {
         showToast(
           lang === 'sw'
-            ? 'Seva ya Supabase haipatikani. Angalia muunganisho wa intaneti yako au uanzishe tena mradi wako kwenye app.supabase.com.'
-            : 'Cannot reach Supabase. Check your internet connection or resume your project at app.supabase.com.',
+            ? 'Huduma ya kuingia haikujibu kwa wakati. Tafadhali jaribu tena baada ya muda mfupi.'
+            : 'The sign-in service did not respond in time. Please try again in a moment.',
           'error'
         );
       } else {
