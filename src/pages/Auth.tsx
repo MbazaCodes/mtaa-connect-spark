@@ -347,22 +347,39 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
     if (error) showToast((error as { message?: string }).message ?? 'Error', 'error');
   };
 
-  // ── OTP Handlers ──────────────────────────────────────────────────
+  // ── OTP Handlers (Firebase for phone, Supabase for email) ──────
   const handleSendPhoneOtp = async () => {
-    const phone = otpPhone.trim().replace(/\s/g, '');
-    if (!phone || phone.length < 10) {
+    const phone = otpPhone.trim();
+    if (!phone || phone.length < 9) {
       showToast(lang === 'sw' ? 'Ingiza namba sahihi ya simu' : 'Enter a valid phone number', 'error');
       return;
     }
-    // Ensure +255 prefix for Tanzania
-    const formattedPhone = phone.startsWith('+') ? phone : phone.startsWith('0') ? `+255${phone.slice(1)}` : `+255${phone}`;
     setOtpLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
-      if (error) throw error;
-      setOtpPhone(formattedPhone);
-      setOtpSent(true);
-      showToast(lang === 'sw' ? `OTP imetumwa kwa ${formattedPhone}` : `OTP sent to ${formattedPhone}`, 'success');
+      // Try Firebase first (free SMS, better TZ coverage)
+      const { isFirebaseConfigured } = await import('@/lib/firebase');
+      if (isFirebaseConfigured) {
+        const { setupRecaptcha, sendPhoneOTP, formatTZPhone } = await import('@/lib/firebaseAuth');
+        const formatted = formatTZPhone(phone);
+        setOtpPhone(formatted);
+
+        // Setup reCAPTCHA on the send button
+        setupRecaptcha('phone-otp-send-btn');
+
+        const result = await sendPhoneOTP(formatted);
+        if (!result.success) throw new Error(result.error);
+
+        setOtpSent(true);
+        showToast(lang === 'sw' ? `OTP imetumwa kwa ${formatted}` : `OTP sent to ${formatted}`, 'success');
+      } else {
+        // Fallback to Supabase phone OTP
+        const formatted = phone.startsWith('+') ? phone : phone.startsWith('0') ? `+255${phone.slice(1)}` : `+255${phone}`;
+        setOtpPhone(formatted);
+        const { error } = await supabase.auth.signInWithOtp({ phone: formatted });
+        if (error) throw error;
+        setOtpSent(true);
+        showToast(lang === 'sw' ? `OTP imetumwa kwa ${formatted}` : `OTP sent to ${formatted}`, 'success');
+      }
     } catch (err: any) {
       showToast(err.message || 'Failed to send OTP', 'error');
     } finally {
@@ -396,13 +413,40 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
     }
     setOtpLoading(true);
     try {
-      const verifyPayload = otpMode === 'phone'
-        ? { phone: otpPhone, token: otpCode, type: 'sms' as const }
-        : { email: otpEmail, token: otpCode, type: 'email' as const };
-      const { error } = await supabase.auth.verifyOtp(verifyPayload);
-      if (error) throw error;
-      showToast(lang === 'sw' ? 'Umeingia kwa mafanikio!' : 'Logged in successfully!', 'success');
-      // Auth state change will redirect automatically
+      if (otpMode === 'phone') {
+        // Try Firebase verification first
+        const { isFirebaseConfigured } = await import('@/lib/firebase');
+        if (isFirebaseConfigured) {
+          const { verifyPhoneOTP, syncFirebaseUserToSupabase } = await import('@/lib/firebaseAuth');
+          const result = await verifyPhoneOTP(otpCode);
+          if (!result.success) throw new Error(result.error);
+
+          // Sync to Supabase
+          const sync = await syncFirebaseUserToSupabase(result.firebaseUid!, result.phone!);
+          if (!sync.success) throw new Error(sync.error);
+
+          if (sync.isNew) {
+            showToast(lang === 'sw' ? 'Akaunti mpya imeundwa! Tafadhali kamilisha wasifu wako.' : 'New account created! Please complete your profile.', 'success');
+          } else {
+            showToast(lang === 'sw' ? 'Umeingia kwa mafanikio!' : 'Logged in successfully!', 'success');
+          }
+
+          // Sign into Supabase with the phone user's email
+          const tempEmail = `phone_${(result.phone || '').replace(/\+/g, '')}@emtaa.tz`;
+          const tempPass = `Firebase_${(result.firebaseUid || '').slice(0, 16)}!`;
+          await supabase.auth.signInWithPassword({ email: tempEmail, password: tempPass });
+        } else {
+          // Fallback to Supabase phone OTP verification
+          const { error } = await supabase.auth.verifyOtp({ phone: otpPhone, token: otpCode, type: 'sms' as const });
+          if (error) throw error;
+          showToast(lang === 'sw' ? 'Umeingia kwa mafanikio!' : 'Logged in successfully!', 'success');
+        }
+      } else {
+        // Email OTP — always Supabase
+        const { error } = await supabase.auth.verifyOtp({ email: otpEmail, token: otpCode, type: 'email' as const });
+        if (error) throw error;
+        showToast(lang === 'sw' ? 'Umeingia kwa mafanikio!' : 'Logged in successfully!', 'success');
+      }
     } catch (err: any) {
       showToast(err.message || (lang === 'sw' ? 'OTP si sahihi' : 'Invalid OTP code'), 'error');
     } finally {
@@ -416,6 +460,8 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
     setOtpEmail('');
     setOtpCode('');
     setOtpSent(false);
+    // Cleanup Firebase reCAPTCHA
+    import('@/lib/firebaseAuth').then(m => m.cleanupRecaptcha()).catch(() => {});
   };
 
   const handleVerifySecurity = async (e: React.FormEvent) => {
@@ -827,6 +873,7 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
                                   className="w-full h-12 px-4 bg-white border border-stone-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"/>
                               )}
                               <button type="button" disabled={otpLoading}
+                                id="phone-otp-send-btn"
                                 onClick={otpMode === 'phone' ? handleSendPhoneOtp : handleSendEmailOtp}
                                 className={`w-full h-11 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${
                                   otpMode === 'phone' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}>

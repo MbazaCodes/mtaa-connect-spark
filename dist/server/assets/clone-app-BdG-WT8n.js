@@ -19941,19 +19941,31 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
     if (error) showToast(error.message ?? "Error", "error");
   };
   const handleSendPhoneOtp = async () => {
-    const phone = otpPhone.trim().replace(/\s/g, "");
-    if (!phone || phone.length < 10) {
+    const phone = otpPhone.trim();
+    if (!phone || phone.length < 9) {
       showToast(lang === "sw" ? "Ingiza namba sahihi ya simu" : "Enter a valid phone number", "error");
       return;
     }
-    const formattedPhone = phone.startsWith("+") ? phone : phone.startsWith("0") ? `+255${phone.slice(1)}` : `+255${phone}`;
     setOtpLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
-      if (error) throw error;
-      setOtpPhone(formattedPhone);
-      setOtpSent(true);
-      showToast(lang === "sw" ? `OTP imetumwa kwa ${formattedPhone}` : `OTP sent to ${formattedPhone}`, "success");
+      const { isFirebaseConfigured } = await import("./firebase-CUqX2yAt.js");
+      if (isFirebaseConfigured) {
+        const { setupRecaptcha, sendPhoneOTP, formatTZPhone } = await import("./firebaseAuth-DRkA4VP0.js");
+        const formatted = formatTZPhone(phone);
+        setOtpPhone(formatted);
+        setupRecaptcha("phone-otp-send-btn");
+        const result = await sendPhoneOTP(formatted);
+        if (!result.success) throw new Error(result.error);
+        setOtpSent(true);
+        showToast(lang === "sw" ? `OTP imetumwa kwa ${formatted}` : `OTP sent to ${formatted}`, "success");
+      } else {
+        const formatted = phone.startsWith("+") ? phone : phone.startsWith("0") ? `+255${phone.slice(1)}` : `+255${phone}`;
+        setOtpPhone(formatted);
+        const { error } = await supabase.auth.signInWithOtp({ phone: formatted });
+        if (error) throw error;
+        setOtpSent(true);
+        showToast(lang === "sw" ? `OTP imetumwa kwa ${formatted}` : `OTP sent to ${formatted}`, "success");
+      }
     } catch (err) {
       showToast(err.message || "Failed to send OTP", "error");
     } finally {
@@ -19985,10 +19997,32 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
     }
     setOtpLoading(true);
     try {
-      const verifyPayload = otpMode === "phone" ? { phone: otpPhone, token: otpCode, type: "sms" } : { email: otpEmail, token: otpCode, type: "email" };
-      const { error } = await supabase.auth.verifyOtp(verifyPayload);
-      if (error) throw error;
-      showToast(lang === "sw" ? "Umeingia kwa mafanikio!" : "Logged in successfully!", "success");
+      if (otpMode === "phone") {
+        const { isFirebaseConfigured } = await import("./firebase-CUqX2yAt.js");
+        if (isFirebaseConfigured) {
+          const { verifyPhoneOTP, syncFirebaseUserToSupabase } = await import("./firebaseAuth-DRkA4VP0.js");
+          const result = await verifyPhoneOTP(otpCode);
+          if (!result.success) throw new Error(result.error);
+          const sync = await syncFirebaseUserToSupabase(result.firebaseUid, result.phone);
+          if (!sync.success) throw new Error(sync.error);
+          if (sync.isNew) {
+            showToast(lang === "sw" ? "Akaunti mpya imeundwa! Tafadhali kamilisha wasifu wako." : "New account created! Please complete your profile.", "success");
+          } else {
+            showToast(lang === "sw" ? "Umeingia kwa mafanikio!" : "Logged in successfully!", "success");
+          }
+          const tempEmail = `phone_${(result.phone || "").replace(/\+/g, "")}@emtaa.tz`;
+          const tempPass = `Firebase_${(result.firebaseUid || "").slice(0, 16)}!`;
+          await supabase.auth.signInWithPassword({ email: tempEmail, password: tempPass });
+        } else {
+          const { error } = await supabase.auth.verifyOtp({ phone: otpPhone, token: otpCode, type: "sms" });
+          if (error) throw error;
+          showToast(lang === "sw" ? "Umeingia kwa mafanikio!" : "Logged in successfully!", "success");
+        }
+      } else {
+        const { error } = await supabase.auth.verifyOtp({ email: otpEmail, token: otpCode, type: "email" });
+        if (error) throw error;
+        showToast(lang === "sw" ? "Umeingia kwa mafanikio!" : "Logged in successfully!", "success");
+      }
     } catch (err) {
       showToast(err.message || (lang === "sw" ? "OTP si sahihi" : "Invalid OTP code"), "error");
     } finally {
@@ -20001,6 +20035,8 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
     setOtpEmail("");
     setOtpCode("");
     setOtpSent(false);
+    import("./firebaseAuth-DRkA4VP0.js").then((m) => m.cleanupRecaptcha()).catch(() => {
+    });
   };
   const handleVerifySecurity = async (e) => {
     e.preventDefault();
@@ -20437,6 +20473,7 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
                       {
                         type: "button",
                         disabled: otpLoading,
+                        id: "phone-otp-send-btn",
                         onClick: otpMode === "phone" ? handleSendPhoneOtp : handleSendEmailOtp,
                         className: `w-full h-11 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${otpMode === "phone" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blue-600 hover:bg-blue-700"}`,
                         children: [

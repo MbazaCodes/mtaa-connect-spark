@@ -1,0 +1,1 @@
+import{P as a,R as n,s as t,a as o}from"./index-9d184c40-rxbGcjXU.js";const e=!1;let i=null;export{a as PhoneAuthProvider,n as RecaptchaVerifier,i as firebaseAuth,e as isFirebaseConfigured,t as signInWithCredential,o as signInWithPhoneNumber};
