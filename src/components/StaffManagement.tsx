@@ -12,6 +12,7 @@ import {
   Phone,
   X,
   CheckCircle2,
+  CheckCircle,
   AlertCircle,
   Loader2,
   ArrowRight,
@@ -64,8 +65,16 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
   
   const [newStaff, setNewStaff] = useState({
     email: '',
-    role: 'staff' as 'staff' | 'admin'
+    role: 'staff' as 'staff' | 'admin',
+    password: '',
   });
+
+  // Generate a default password when modal opens
+  const generatePassword = () => {
+    const array = new Uint8Array(8);
+    crypto.getRandomValues(array);
+    return btoa(String.fromCharCode(...array)).replace(/[+/=]/g, '').slice(0, 8) + 'Tz1!';
+  };
 
   const [errors, setErrors] = useState<{[key: string]: string}>({});
 
@@ -237,10 +246,8 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
         return;
       }
 
-      // Generate a cryptographically secure temporary password
-      const array = new Uint8Array(12);
-      crypto.getRandomValues(array);
-      const tempPassword = btoa(String.fromCharCode(...array)).replace(/[+/=]/g, '').slice(0, 12) + 'Tz1!';
+      // Use the password from the form (admin can customize)
+      const tempPassword = newStaff.password || generatePassword();
 
       // Save admin session — signUp can swap the current session if email
       // confirmation is disabled in Supabase settings
@@ -322,7 +329,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
   };
 
   const resetForm = () => {
-    setNewStaff({ email: '', role: 'staff' });
+    setNewStaff({ email: '', role: 'staff', password: '' });
     setSelectedRegion('');
     setSelectedDistrict('');
     setOfficeLevel('region');
@@ -466,6 +473,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
           <button 
             onClick={() => {
               resetForm();
+              setNewStaff(prev => ({ ...prev, password: generatePassword() }));
               setShowAddModal(true);
             }}
             className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
@@ -620,6 +628,33 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
                         <AlertCircle size={12} /> {errors.email}
                       </p>
                     )}
+                  </div>
+
+                  {/* Password Input */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1">
+                      🔑 {lang === 'sw' ? 'Nywila ya Muda' : 'Temporary Password'} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input 
+                        required
+                        type="text"
+                        placeholder="e.g. Staff2026!"
+                        className="flex-1 h-12 px-4 rounded-xl border border-stone-200 focus:border-emerald-500 outline-none transition-all font-mono text-sm"
+                        value={newStaff.password}
+                        onChange={(e) => setNewStaff({...newStaff, password: e.target.value})}
+                      />
+                      <button type="button" onClick={() => setNewStaff({...newStaff, password: generatePassword()})}
+                        className="px-3 h-12 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl text-xs font-bold transition-colors whitespace-nowrap"
+                        title={lang === 'sw' ? 'Tengeneza nywila mpya' : 'Generate new password'}>
+                        🔄 {lang === 'sw' ? 'Badilisha' : 'Generate'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-stone-400">
+                      {lang === 'sw' 
+                        ? 'Mpe mtumishi nywila hii. Anaweza kuibadilisha baadaye.' 
+                        : 'Share this password with the staff member. They can change it later.'}
+                    </p>
                   </div>
 
                   {/* Region Selection */}
@@ -778,13 +813,54 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
                   <button 
                     disabled={loading}
                     type="submit"
-                    className="flex-1 h-14 bg-primary text-white rounded-2xl font-bold hover:bg-tz-blue transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                    className="flex-1 h-14 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2"
                   >
                     {loading ? <Loader2 className="animate-spin" /> : <UserPlus size={20} />}
                     {lang === 'sw' ? 'Sajili' : 'Register'}
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Credentials Created Dialog */}
+      <AnimatePresence>
+        {createdTempPassword && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
+              <div className="bg-emerald-600 px-6 py-5 text-center">
+                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle size={28} className="text-white"/>
+                </div>
+                <h3 className="text-lg font-black text-white">{lang === 'sw' ? 'Mtumishi Amesajiliwa!' : 'Staff Registered!'}</h3>
+                <p className="text-emerald-100 text-xs mt-1">{lang === 'sw' ? 'Mpe taarifa hizi mtumishi' : 'Share these credentials with the staff member'}</p>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="bg-stone-50 rounded-xl p-4 space-y-3">
+                  <div>
+                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-0.5">{lang === 'sw' ? 'Barua Pepe' : 'Email'}</p>
+                    <p className="text-sm font-bold text-stone-800 font-mono">{newStaff.email || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-0.5">{lang === 'sw' ? 'Nywila ya Muda' : 'Temporary Password'}</p>
+                    <p className="text-lg font-black text-emerald-700 font-mono tracking-wider">{createdTempPassword}</p>
+                  </div>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <p className="text-xs text-amber-700 font-medium">
+                    {lang === 'sw'
+                      ? '⚠ Nywila hii ni ya muda. Mtumishi anapaswa kuibadilisha mara anapoingia kwa mara ya kwanza.'
+                      : '⚠ This is a temporary password. The staff member should change it on first login.'}
+                  </p>
+                </div>
+                <button onClick={() => setCreatedTempPassword('')}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors">
+                  {lang === 'sw' ? 'Nimekwisha — Funga' : 'Done — Close'}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
