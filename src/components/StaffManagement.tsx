@@ -354,25 +354,40 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
   };
 
   const handleDeleteStaff = async (staffId: string) => {
-    if (!confirm(lang === 'sw' ? 'Je, una uhakika unataka kumfuta mtumishi huyu?' : 'Are you sure you want to delete this staff member?')) return;
+    // Prevent admin from deleting themselves
+    if (staffId === user?.id) {
+      showToast(lang === 'sw' ? 'Huwezi kujifuta mwenyewe.' : 'You cannot delete yourself.', 'error');
+      return;
+    }
+
+    if (!confirm(lang === 'sw' 
+      ? 'Je, una uhakika unataka kumzima mtumishi huyu? Akaunti yake itazimwa lakini data haitafutwa.' 
+      : 'Are you sure you want to deactivate this staff member? Their account will be disabled but data preserved.')) return;
     
     try {
-      // Note: In production, you'd need to handle auth user deletion via Edge Function
+      // Soft delete: deactivate account + revoke role (preserves FK references)
       const { error } = await supabase
         .from('users')
-        .delete()
+        .update({ 
+          account_status: 'deactivated',
+          role: 'citizen', // Revoke staff/admin access
+        })
         .eq('id', staffId);
       
       if (error) throw error;
       
-      showToast(lang === 'sw' ? 'Mtumishi amefutwa' : 'Staff deleted', 'success');
+      showToast(lang === 'sw' ? 'Mtumishi amezimwa' : 'Staff deactivated', 'success');
       setShowDetailsModal(false);
       setSelectedStaff(null);
       fetchStaff();
     } catch (err: unknown) {
-      const _e = err as { message?: string };
       const _err = err as { message?: string };
-      showToast(_err.message ?? "", 'error');
+      showToast(
+        lang === 'sw'
+          ? `Imeshindwa: ${_err.message || 'Hitilafu isiyojulikana'}`
+          : `Failed: ${_err.message || 'Unknown error'}`,
+        'error'
+      );
     }
   };
 
@@ -562,8 +577,8 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
                         e.stopPropagation();
                         handleDeleteStaff(s.id);
                       }}
-                      title={lang === 'sw' ? 'Futa mtumishi' : 'Delete staff'}
-                      aria-label={lang === 'sw' ? 'Futa mtumishi' : 'Delete staff'}
+                      title={lang === 'sw' ? 'Zima mtumishi' : 'Deactivate staff'}
+                      aria-label={lang === 'sw' ? 'Zima mtumishi' : 'Deactivate staff'}
                       className="p-2 text-stone-400 hover:text-red-500 transition-colors"
                     >
                       <Trash2 size={18} />
@@ -1168,7 +1183,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
                     className="h-12 px-6 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-all flex items-center gap-2"
                   >
                     <Trash2 size={18} />
-                    {lang === 'sw' ? 'Futa' : 'Delete'}
+                    {lang === 'sw' ? 'Zima Akaunti' : 'Deactivate'}
                   </button>
                 </div>
               </div>
