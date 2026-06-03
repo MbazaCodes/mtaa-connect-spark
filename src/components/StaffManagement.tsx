@@ -367,11 +367,11 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
       : 'Are you sure you want to deactivate this staff member? Their account will be disabled but data preserved.')) return;
     
     try {
-      // Soft delete: deactivate account + revoke role (preserves FK references)
+      // Soft delete: suspend account + revoke role (preserves FK references)
       const { error } = await supabase
         .from('users')
         .update({ 
-          account_status: 'deactivated',
+          account_status: 'suspended',
           role: 'citizen', // Revoke staff/admin access
         })
         .eq('id', staffId);

@@ -29871,7 +29871,7 @@ const StaffManagement = ({ lang }) => {
     if (!confirm(lang === "sw" ? "Je, una uhakika unataka kumzima mtumishi huyu? Akaunti yake itazimwa lakini data haitafutwa." : "Are you sure you want to deactivate this staff member? Their account will be disabled but data preserved.")) return;
     try {
       const { error } = await supabase.from("users").update({
-        account_status: "deactivated",
+        account_status: "suspended",
         role: "citizen"
         // Revoke staff/admin access
       }).eq("id", staffId);
