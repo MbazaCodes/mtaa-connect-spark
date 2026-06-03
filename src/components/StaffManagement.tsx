@@ -468,7 +468,7 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
               resetForm();
               setShowAddModal(true);
             }}
-            className="bg-primary text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-tz-blue transition-all shadow-lg shadow-primary/20"
+            className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
           >
             <Plus size={20} /> {lang === 'sw' ? 'Ongeza Mtumishi' : 'Add Staff'}
           </button>

@@ -331,7 +331,7 @@ export function Agreement() {
               {L('Jaza fomu kwa ukamilifu. Wafanyakazi watakagua.', 'Complete the form. Staff will review.')}
             </p>
           </div>
-          <button onClick={cancelApp} className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg"><X size={20}/></button>
+          <button onClick={cancelApp} aria-label={L('Ghairi', 'Cancel')} className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg"><X size={20}/></button>
         </div>
 
         {/* Progress */}
@@ -450,6 +450,7 @@ export function Agreement() {
               <div>
                 <label className={lbl}>{L('Utaalamu', 'Specialization')} <span className="text-red-500">*</span></label>
                 <select value={specialization} onChange={e => { setSpecialization(e.target.value); clrErr('specialization'); }}
+                  aria-label={L('Utaalamu', 'Specialization')}
                   className={inputCls('specialization')}>
                   <option value="">{L('Chagua', 'Select')}</option>
                   {SPECIALIZATIONS[bizType as BusinessType]?.map(s => (
@@ -497,6 +498,7 @@ export function Agreement() {
               <div>
                 <label className={lbl}>{L('Mkoa', 'Region')} <span className="text-red-500">*</span></label>
                 <select value={region} onChange={e => { setRegion(e.target.value); setDistrict(''); setWard(''); clrErr('region'); }}
+                  aria-label={L('Mkoa', 'Region')}
                   className={inputCls('region')}>
                   <option value="">{L('Chagua Mkoa', 'Select Region')}</option>
                   {TANZANIA_ADDRESS_DATA.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
@@ -508,6 +510,7 @@ export function Agreement() {
                 <div>
                   <label className={lbl}>{L('Wilaya', 'District')} <span className="text-red-500">*</span></label>
                   <select value={district} onChange={e => { setDistrict(e.target.value); setWard(''); clrErr('district'); }}
+                    aria-label={L('Wilaya', 'District')}
                     disabled={!region} className={`${inputCls('district')} disabled:bg-stone-50`}>
                     <option value="">{L('Chagua Wilaya', 'Select District')}</option>
                     {districts.map(d => <option key={d} value={d}>{d}</option>)}
@@ -517,6 +520,7 @@ export function Agreement() {
                 <div>
                   <label className={lbl}>{L('Kata', 'Ward')} <span className="text-red-500">*</span></label>
                   <select value={ward} onChange={e => { setWard(e.target.value); clrErr('ward'); }}
+                    aria-label={L('Kata', 'Ward')}
                     disabled={!district} className={`${inputCls('ward')} disabled:bg-stone-50`}>
                     <option value="">{L('Chagua Kata', 'Select Ward')}</option>
                     {wards.map(w => <option key={w} value={w}>{w}</option>)}
@@ -573,7 +577,7 @@ export function Agreement() {
                           <p className="text-xs font-bold text-stone-700 truncate">{item.doc.file.name}</p>
                           <p className="text-xs text-stone-400">{(item.doc.file.size / 1024).toFixed(0)} KB</p>
                         </div>
-                        <button type="button" onClick={e => { e.stopPropagation(); URL.revokeObjectURL(item.doc!.preview); item.setter(null as any); }}
+                        <button type="button" aria-label={L('Ondoa faili', 'Remove file')} onClick={e => { e.stopPropagation(); URL.revokeObjectURL(item.doc!.preview); item.setter(null as any); }}
                           className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full shrink-0">
                           <X size={13}/>
                         </button>
@@ -587,6 +591,7 @@ export function Agreement() {
                     )}
                   </div>
                   <input ref={item.ref as React.RefObject<HTMLInputElement>} type="file"
+                    aria-label={lang === 'sw' ? item.swLabel : item.enLabel}
                     accept="image/jpeg,image/png,image/webp,application/pdf"
                     onChange={e => {
                       const f = e.target.files?.[0]; if (!f) return;

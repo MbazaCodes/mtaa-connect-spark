@@ -254,9 +254,9 @@ export default function App() {
           </PageTransition></AppShell></ProtectedRoute>} />
 
           {/* Staff routes */}
-          <Route path="/staff" element={<ProtectedRoute allowedRoles={['staff']}><AppShell><PageTransition><StaffDashboardRoute /></PageTransition></AppShell></ProtectedRoute>} />
-          <Route path="/staff/support" element={<ProtectedRoute allowedRoles={['staff']}><AppShell><PageTransition><CustomerSupport /></PageTransition></AppShell></ProtectedRoute>} />
-          <Route path="/staff/verification" element={<ProtectedRoute allowedRoles={['staff']}><AppShell><PageTransition><ManualVerification /></PageTransition></AppShell></ProtectedRoute>} />
+          <Route path="/staff" element={<ProtectedRoute allowedRoles={['staff', 'admin']}><AppShell><PageTransition><StaffDashboardRoute /></PageTransition></AppShell></ProtectedRoute>} />
+          <Route path="/staff/support" element={<ProtectedRoute allowedRoles={['staff', 'admin']}><AppShell><PageTransition><CustomerSupport /></PageTransition></AppShell></ProtectedRoute>} />
+          <Route path="/staff/verification" element={<ProtectedRoute allowedRoles={['staff', 'admin']}><AppShell><PageTransition><ManualVerification /></PageTransition></AppShell></ProtectedRoute>} />
           <Route path="/staff/business" element={<ProtectedRoute allowedRoles={['staff', 'admin']}><AppShell><PageTransition><BusinessApproval /></PageTransition></AppShell></ProtectedRoute>} />
           <Route path="/staff/review" element={<ProtectedRoute allowedRoles={['staff', 'admin']}><AppShell><PageTransition>
             <ApplicationReview lang={lang} />

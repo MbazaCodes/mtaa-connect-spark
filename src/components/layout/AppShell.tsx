@@ -21,7 +21,7 @@ export const VIEW_PATHS: Record<ViewName, string> = {
   applications:        '/applications',
   notifications:       '/notifications',
   profile:             '/profile',
-  verify_documents:    '/verify',
+  verify_documents:    '/verify-docs',
   agreement:            '/agreement',
   staff_dashboard:     '/staff',
   customer_support:    '/staff/support',
