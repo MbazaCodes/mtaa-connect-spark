@@ -2,7 +2,7 @@ import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, useRouter, Link, Outlet, HeadContent, Scripts, createFileRoute, lazyRouteComponent, createRouter } from "@tanstack/react-router";
 import { jsx, jsxs } from "react/jsx-runtime";
 import { useEffect } from "react";
-const appCss = "/assets/styles-DEHiu4kB.css";
+const appCss = "/assets/styles-BKSwJ8no.css";
 function reportLovableError(error, context = {}) {
   if (typeof window === "undefined") return;
   window.__lovableEvents?.captureException?.(
@@ -113,11 +113,11 @@ function RootComponent() {
   const { queryClient } = Route$2.useRouteContext();
   return /* @__PURE__ */ jsx(QueryClientProvider, { client: queryClient, children: /* @__PURE__ */ jsx(Outlet, {}) });
 }
-const $$splitComponentImporter$1 = () => import("./_-C0_6lfYv.js");
+const $$splitComponentImporter$1 = () => import("./_-s3Sykr5R.js");
 const Route$1 = createFileRoute("/$")({
   component: lazyRouteComponent($$splitComponentImporter$1, "component")
 });
-const $$splitComponentImporter = () => import("./index-C0_6lfYv.js");
+const $$splitComponentImporter = () => import("./index-s3Sykr5R.js");
 const Route = createFileRoute("/")({
   head: () => ({
     meta: [{

@@ -296,6 +296,26 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
           }
         })();
 
+        // Auto-verify staff/admin on first successful login
+        (async () => {
+          try {
+            const { data: profile } = await supabase
+              .from('users')
+              .select('role, is_verified')
+              .eq('id', data.user!.id)
+              .maybeSingle();
+            if (profile && ['staff', 'admin'].includes(profile.role) && !profile.is_verified) {
+              await supabase
+                .from('users')
+                .update({ is_verified: true })
+                .eq('id', data.user!.id);
+              console.log('[Auth] Staff auto-verified on first login');
+            }
+          } catch (e) {
+            console.warn('[Auth] Auto-verify check failed:', e);
+          }
+        })();
+
         // Do not block login UX on profile refresh.
         // Non-blocking profile refresh — fully silent, never throws
         fetchUserProfile(data.user.id).catch(() => {});

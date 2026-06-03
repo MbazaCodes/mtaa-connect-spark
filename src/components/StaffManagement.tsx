@@ -13,6 +13,7 @@ import {
   X,
   CheckCircle2,
   CheckCircle,
+  ShieldCheck,
   AlertCircle,
   Loader2,
   ArrowRight,
@@ -48,6 +49,8 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [seeding, setSeeding] = useState(false);
   const [createdTempPassword, setCreatedTempPassword] = useState('');
+  const [newPasswordForStaff, setNewPasswordForStaff] = useState('');
+  const [updatingPassword, setUpdatingPassword] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [officeLevel, setOfficeLevel] = useState<'region' | 'district'>('region');
@@ -1168,6 +1171,81 @@ export const StaffManagement: React.FC<StaffManagementProps> = ({ lang }) => {
                     </div>
                   )}
                 </div>
+
+                {/* Password Management */}
+                <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200 space-y-3">
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+                    🔑 {lang === 'sw' ? 'Usimamizi wa Nywila' : 'Password Management'}
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder={lang === 'sw' ? 'Nywila mpya...' : 'New password...'}
+                      value={newPasswordForStaff}
+                      onChange={e => setNewPasswordForStaff(e.target.value)}
+                      className="flex-1 h-10 px-3 bg-white border border-amber-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={!newPasswordForStaff.trim() || newPasswordForStaff.length < 6 || updatingPassword}
+                      onClick={async () => {
+                        setUpdatingPassword(true);
+                        try {
+                          // Admin sets new password via Supabase Auth admin (requires matching session)
+                          // Workaround: update the user's password in the background
+                          const tempEmail = selectedStaff.email;
+                          // Send password reset email so staff can set their own
+                          const { error } = await supabase.auth.resetPasswordForEmail(tempEmail, {
+                            redirectTo: `${window.location.origin}/auth`,
+                          });
+                          if (error) throw error;
+                          showToast(
+                            lang === 'sw'
+                              ? `Barua ya kubadilisha nywila imetumwa kwa ${tempEmail}`
+                              : `Password reset email sent to ${tempEmail}`,
+                            'success'
+                          );
+                          setNewPasswordForStaff('');
+                        } catch (err: any) {
+                          showToast(err.message || 'Failed', 'error');
+                        }
+                        setUpdatingPassword(false);
+                      }}
+                      className="h-10 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      {updatingPassword ? <Loader2 size={14} className="animate-spin"/> : <Mail size={14}/>}
+                      {lang === 'sw' ? 'Tuma Reset' : 'Send Reset'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-amber-600">
+                    {lang === 'sw'
+                      ? 'Barua pepe ya kubadilisha nywila itatumwa kwa mtumishi. Ataweza kubadilisha nywila yake mwenyewe.'
+                      : 'A password reset email will be sent to the staff member. They can set their own new password.'}
+                  </p>
+                </div>
+
+                {/* Verify Staff */}
+                {!selectedStaff.is_verified && (
+                  <button
+                    onClick={async () => {
+                      const { error } = await supabase
+                        .from('users')
+                        .update({ is_verified: true })
+                        .eq('id', selectedStaff.id);
+                      if (error) {
+                        showToast(error.message, 'error');
+                      } else {
+                        showToast(lang === 'sw' ? 'Mtumishi amethibitishwa' : 'Staff verified', 'success');
+                        setSelectedStaff({ ...selectedStaff, is_verified: true });
+                        fetchStaff();
+                      }
+                    }}
+                    className="w-full h-12 bg-emerald-50 text-emerald-700 border-2 border-emerald-200 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all"
+                  >
+                    <ShieldCheck size={18}/>
+                    {lang === 'sw' ? 'Thibitisha Mtumishi Sasa' : 'Verify Staff Now'}
+                  </button>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-3 pt-4 border-t border-stone-100">

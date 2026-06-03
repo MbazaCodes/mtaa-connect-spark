@@ -19906,6 +19906,17 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
           } catch {
           }
         })();
+        (async () => {
+          try {
+            const { data: profile } = await supabase.from("users").select("role, is_verified").eq("id", data.user.id).maybeSingle();
+            if (profile && ["staff", "admin"].includes(profile.role) && !profile.is_verified) {
+              await supabase.from("users").update({ is_verified: true }).eq("id", data.user.id);
+              console.log("[Auth] Staff auto-verified on first login");
+            }
+          } catch (e2) {
+            console.warn("[Auth] Auto-verify check failed:", e2);
+          }
+        })();
         fetchUserProfile(data.user.id).catch(() => {
         });
       }
@@ -29624,6 +29635,8 @@ const StaffManagement = ({ lang }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [seeding, setSeeding] = useState(false);
   const [createdTempPassword, setCreatedTempPassword] = useState("");
+  const [newPasswordForStaff, setNewPasswordForStaff] = useState("");
+  const [updatingPassword, setUpdatingPassword] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [officeLevel, setOfficeLevel] = useState("region");
@@ -30594,6 +30607,75 @@ const StaffManagement = ({ lang }) => {
                 ] })
               ] })
             ] }),
+            /* @__PURE__ */ jsxs("div", { className: "bg-amber-50 rounded-2xl p-4 border border-amber-200 space-y-3", children: [
+              /* @__PURE__ */ jsxs("p", { className: "text-xs font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5", children: [
+                "🔑 ",
+                lang === "sw" ? "Usimamizi wa Nywila" : "Password Management"
+              ] }),
+              /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
+                /* @__PURE__ */ jsx(
+                  "input",
+                  {
+                    type: "text",
+                    placeholder: lang === "sw" ? "Nywila mpya..." : "New password...",
+                    value: newPasswordForStaff,
+                    onChange: (e) => setNewPasswordForStaff(e.target.value),
+                    className: "flex-1 h-10 px-3 bg-white border border-amber-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none"
+                  }
+                ),
+                /* @__PURE__ */ jsxs(
+                  "button",
+                  {
+                    type: "button",
+                    disabled: !newPasswordForStaff.trim() || newPasswordForStaff.length < 6 || updatingPassword,
+                    onClick: async () => {
+                      setUpdatingPassword(true);
+                      try {
+                        const tempEmail = selectedStaff.email;
+                        const { error } = await supabase.auth.resetPasswordForEmail(tempEmail, {
+                          redirectTo: `${window.location.origin}/auth`
+                        });
+                        if (error) throw error;
+                        showToast(
+                          lang === "sw" ? `Barua ya kubadilisha nywila imetumwa kwa ${tempEmail}` : `Password reset email sent to ${tempEmail}`,
+                          "success"
+                        );
+                        setNewPasswordForStaff("");
+                      } catch (err) {
+                        showToast(err.message || "Failed", "error");
+                      }
+                      setUpdatingPassword(false);
+                    },
+                    className: "h-10 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap",
+                    children: [
+                      updatingPassword ? /* @__PURE__ */ jsx(Loader2, { size: 14, className: "animate-spin" }) : /* @__PURE__ */ jsx(Mail, { size: 14 }),
+                      lang === "sw" ? "Tuma Reset" : "Send Reset"
+                    ]
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ jsx("p", { className: "text-[10px] text-amber-600", children: lang === "sw" ? "Barua pepe ya kubadilisha nywila itatumwa kwa mtumishi. Ataweza kubadilisha nywila yake mwenyewe." : "A password reset email will be sent to the staff member. They can set their own new password." })
+            ] }),
+            !selectedStaff.is_verified && /* @__PURE__ */ jsxs(
+              "button",
+              {
+                onClick: async () => {
+                  const { error } = await supabase.from("users").update({ is_verified: true }).eq("id", selectedStaff.id);
+                  if (error) {
+                    showToast(error.message, "error");
+                  } else {
+                    showToast(lang === "sw" ? "Mtumishi amethibitishwa" : "Staff verified", "success");
+                    setSelectedStaff({ ...selectedStaff, is_verified: true });
+                    fetchStaff();
+                  }
+                },
+                className: "w-full h-12 bg-emerald-50 text-emerald-700 border-2 border-emerald-200 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all",
+                children: [
+                  /* @__PURE__ */ jsx(ShieldCheck, { size: 18 }),
+                  lang === "sw" ? "Thibitisha Mtumishi Sasa" : "Verify Staff Now"
+                ]
+              }
+            ),
             /* @__PURE__ */ jsxs("div", { className: "flex gap-3 pt-4 border-t border-stone-100", children: [
               /* @__PURE__ */ jsx(
                 "button",
