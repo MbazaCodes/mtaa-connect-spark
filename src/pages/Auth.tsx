@@ -60,6 +60,14 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
   const [nidaVerified, setNidaVerified] = useState(false);
   const [nidaError, setNidaError] = useState<string | null>(null);
 
+  // OTP login state
+  const [otpMode, setOtpMode] = useState<'none' | 'phone' | 'email'>('none');
+  const [otpPhone, setOtpPhone] = useState('');
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+
   const [regForm, setRegForm] = useState({
     firstName: "", middleName: "", lastName: "", sex: "M", nationality: "Mtanzania", nidaNumber: "",
     country: isDiaspora ? "" : "Tanzania", region: "", district: "", ward: "", street: "", phone: "", email: "", password: "", confirmPassword: "",
@@ -337,6 +345,77 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
       }
     });
     if (error) showToast((error as { message?: string }).message ?? 'Error', 'error');
+  };
+
+  // ── OTP Handlers ──────────────────────────────────────────────────
+  const handleSendPhoneOtp = async () => {
+    const phone = otpPhone.trim().replace(/\s/g, '');
+    if (!phone || phone.length < 10) {
+      showToast(lang === 'sw' ? 'Ingiza namba sahihi ya simu' : 'Enter a valid phone number', 'error');
+      return;
+    }
+    // Ensure +255 prefix for Tanzania
+    const formattedPhone = phone.startsWith('+') ? phone : phone.startsWith('0') ? `+255${phone.slice(1)}` : `+255${phone}`;
+    setOtpLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
+      if (error) throw error;
+      setOtpPhone(formattedPhone);
+      setOtpSent(true);
+      showToast(lang === 'sw' ? `OTP imetumwa kwa ${formattedPhone}` : `OTP sent to ${formattedPhone}`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to send OTP', 'error');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleSendEmailOtp = async () => {
+    const emailAddr = otpEmail.trim();
+    if (!emailAddr || !/\S+@\S+\.\S+/.test(emailAddr)) {
+      showToast(lang === 'sw' ? 'Ingiza barua pepe sahihi' : 'Enter a valid email address', 'error');
+      return;
+    }
+    setOtpLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email: emailAddr });
+      if (error) throw error;
+      setOtpSent(true);
+      showToast(lang === 'sw' ? `OTP imetumwa kwa ${emailAddr}` : `OTP sent to ${emailAddr}`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to send OTP', 'error');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim() || otpCode.length < 6) {
+      showToast(lang === 'sw' ? 'Ingiza namba 6 za OTP' : 'Enter the 6-digit OTP code', 'error');
+      return;
+    }
+    setOtpLoading(true);
+    try {
+      const verifyPayload = otpMode === 'phone'
+        ? { phone: otpPhone, token: otpCode, type: 'sms' as const }
+        : { email: otpEmail, token: otpCode, type: 'email' as const };
+      const { error } = await supabase.auth.verifyOtp(verifyPayload);
+      if (error) throw error;
+      showToast(lang === 'sw' ? 'Umeingia kwa mafanikio!' : 'Logged in successfully!', 'success');
+      // Auth state change will redirect automatically
+    } catch (err: any) {
+      showToast(err.message || (lang === 'sw' ? 'OTP si sahihi' : 'Invalid OTP code'), 'error');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const resetOtp = () => {
+    setOtpMode('none');
+    setOtpPhone('');
+    setOtpEmail('');
+    setOtpCode('');
+    setOtpSent(false);
   };
 
   const handleVerifySecurity = async (e: React.FormEvent) => {
@@ -714,6 +793,72 @@ export function Auth({ mode, onClose, setMode, isDiaspora = false }: AuthProps) 
                           Apple
                         </button>
                       </div>
+
+                      {/* OTP Login Options */}
+                      {otpMode === 'none' ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          <button type="button" onClick={() => setOtpMode('phone')}
+                            className="h-12 bg-emerald-50 border-2 border-emerald-200 rounded-xl font-bold text-sm text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 transition-all flex items-center justify-center gap-2">
+                            <Phone size={16}/> {lang === 'sw' ? 'SMS OTP' : 'Phone OTP'}
+                          </button>
+                          <button type="button" onClick={() => setOtpMode('email')}
+                            className="h-12 bg-blue-50 border-2 border-blue-200 rounded-xl font-bold text-sm text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-all flex items-center justify-center gap-2">
+                            <Mail size={16}/> {lang === 'sw' ? 'Email OTP' : 'Email OTP'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold text-stone-600 uppercase tracking-wider flex items-center gap-1.5">
+                              {otpMode === 'phone' ? <><Phone size={13}/> {lang === 'sw' ? 'Ingia kwa SMS' : 'Login via SMS'}</> : <><Mail size={13}/> {lang === 'sw' ? 'Ingia kwa Email OTP' : 'Login via Email OTP'}</>}
+                            </p>
+                            <button type="button" onClick={resetOtp} className="text-xs text-stone-400 hover:text-stone-600 font-bold" aria-label="Close OTP">✕</button>
+                          </div>
+
+                          {!otpSent ? (
+                            <>
+                              {otpMode === 'phone' ? (
+                                <input type="tel" value={otpPhone} onChange={e => setOtpPhone(e.target.value)}
+                                  placeholder="+255 7XX XXX XXX" aria-label="Phone number"
+                                  className="w-full h-12 px-4 bg-white border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm font-mono"/>
+                              ) : (
+                                <input type="email" value={otpEmail} onChange={e => setOtpEmail(e.target.value)}
+                                  placeholder="juma@example.com" aria-label="Email address"
+                                  className="w-full h-12 px-4 bg-white border border-stone-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"/>
+                              )}
+                              <button type="button" disabled={otpLoading}
+                                onClick={otpMode === 'phone' ? handleSendPhoneOtp : handleSendEmailOtp}
+                                className={`w-full h-11 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${
+                                  otpMode === 'phone' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                                {otpLoading ? <Loader2 size={16} className="animate-spin"/> : null}
+                                {lang === 'sw' ? 'Tuma OTP' : 'Send OTP'}
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-xs text-stone-500">
+                                {otpMode === 'phone'
+                                  ? (lang === 'sw' ? `Namba 6 za OTP zimetumwa kwa ${otpPhone}` : `6-digit OTP sent to ${otpPhone}`)
+                                  : (lang === 'sw' ? `Namba 6 za OTP zimetumwa kwa ${otpEmail}` : `6-digit OTP sent to ${otpEmail}`)}
+                              </p>
+                              <input type="text" value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                placeholder="000000" maxLength={6} aria-label="OTP code"
+                                className="w-full h-14 px-4 bg-white border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-center text-2xl font-mono font-bold tracking-[0.5em]"/>
+                              <div className="flex gap-2">
+                                <button type="button" onClick={() => { setOtpSent(false); setOtpCode(''); }}
+                                  className="flex-1 h-11 bg-stone-100 text-stone-600 rounded-xl font-bold text-xs hover:bg-stone-200">
+                                  {lang === 'sw' ? 'Tuma Tena' : 'Resend'}
+                                </button>
+                                <button type="button" disabled={otpLoading || otpCode.length < 6} onClick={handleVerifyOtp}
+                                  className="flex-[2] h-11 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                                  {otpLoading ? <Loader2 size={14} className="animate-spin"/> : <CheckCircle2 size={14}/>}
+                                  {lang === 'sw' ? 'Thibitisha' : 'Verify'}
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
 
                       <div className="text-center">
                         <p className="text-sm text-stone-500">
