@@ -19948,9 +19948,9 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
     }
     setOtpLoading(true);
     try {
-      const { isFirebaseConfigured } = await import("./firebase-CUqX2yAt.js");
+      const { isFirebaseConfigured } = await import("./firebase-Czw1M5xv.js");
       if (isFirebaseConfigured) {
-        const { setupRecaptcha, sendPhoneOTP, formatTZPhone } = await import("./firebaseAuth-DRkA4VP0.js");
+        const { setupRecaptcha, sendPhoneOTP, formatTZPhone } = await import("./firebaseAuth-B43a6Gm4.js");
         const formatted = formatTZPhone(phone);
         setOtpPhone(formatted);
         setupRecaptcha("phone-otp-send-btn");
@@ -19998,9 +19998,9 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
     setOtpLoading(true);
     try {
       if (otpMode === "phone") {
-        const { isFirebaseConfigured } = await import("./firebase-CUqX2yAt.js");
+        const { isFirebaseConfigured } = await import("./firebase-Czw1M5xv.js");
         if (isFirebaseConfigured) {
-          const { verifyPhoneOTP, syncFirebaseUserToSupabase } = await import("./firebaseAuth-DRkA4VP0.js");
+          const { verifyPhoneOTP, syncFirebaseUserToSupabase } = await import("./firebaseAuth-B43a6Gm4.js");
           const result = await verifyPhoneOTP(otpCode);
           if (!result.success) throw new Error(result.error);
           const sync = await syncFirebaseUserToSupabase(result.firebaseUid, result.phone);
@@ -20035,7 +20035,7 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
     setOtpEmail("");
     setOtpCode("");
     setOtpSent(false);
-    import("./firebaseAuth-DRkA4VP0.js").then((m) => m.cleanupRecaptcha()).catch(() => {
+    import("./firebaseAuth-B43a6Gm4.js").then((m) => m.cleanupRecaptcha()).catch(() => {
     });
   };
   const handleVerifySecurity = async (e) => {

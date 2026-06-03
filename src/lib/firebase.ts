@@ -23,10 +23,13 @@ import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, s
 import type { Auth, ConfirmationResult } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey:     import.meta.env.VITE_FIREBASE_API_KEY     || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId:  import.meta.env.VITE_FIREBASE_PROJECT_ID  || '',
-  appId:      import.meta.env.VITE_FIREBASE_APP_ID      || '',
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || 'AIzaSyCkuKa0qw34xr8iesJCoJFk5RBSlU7UuGo',
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || 'studio-6129823290-b6caa.firebaseapp.com',
+  databaseURL:       import.meta.env.VITE_FIREBASE_DATABASE_URL       || 'https://studio-6129823290-b6caa-default-rtdb.firebaseio.com',
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || 'studio-6129823290-b6caa',
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || 'studio-6129823290-b6caa.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_ID       || '98693062073',
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID             || '1:98693062073:web:54028356393cf1cfc3aa68',
 };
 
 // Only initialize if config is present

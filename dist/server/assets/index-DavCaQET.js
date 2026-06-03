@@ -1,4 +1,4 @@
-import { C as ClonedApp } from "./cloned-app-mount-CL3RSHMz.js";
+import { C as ClonedApp } from "./cloned-app-mount-BiEq93Wi.js";
 import "react/jsx-runtime";
 import "react";
 const SplitComponent = ClonedApp;

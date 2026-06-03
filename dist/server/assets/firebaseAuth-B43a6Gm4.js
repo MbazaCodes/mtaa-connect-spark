@@ -1,10 +1,12 @@
-import "firebase/app";
-import "firebase/auth";
+import { firebaseAuth, isFirebaseConfigured as isConfigured } from "./firebase-Czw1M5xv.js";
 import { s as supabase } from "./AuthContext-Dat9LlRJ.js";
+import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+import "firebase/app";
 import "react/jsx-runtime";
 import "react";
 import "./client-Bkk6o3Z0.js";
 import "@supabase/supabase-js";
+let recaptchaVerifier = null;
 let confirmationResult = null;
 function formatTZPhone(phone) {
   const cleaned = phone.replace(/[\s\-()]/g, "");
@@ -14,14 +16,44 @@ function formatTZPhone(phone) {
   return `+255${cleaned}`;
 }
 function setupRecaptcha(buttonId) {
-  {
+  if (!firebaseAuth || !isConfigured) {
     console.warn("Firebase not configured — phone OTP unavailable");
+    return false;
+  }
+  try {
+    if (recaptchaVerifier) {
+      recaptchaVerifier.clear();
+      recaptchaVerifier = null;
+    }
+    recaptchaVerifier = new RecaptchaVerifier(firebaseAuth, buttonId, {
+      size: "invisible",
+      callback: () => {
+      },
+      "expired-callback": () => {
+        console.warn("reCAPTCHA expired");
+      }
+    });
+    return true;
+  } catch (err) {
+    console.error("setupRecaptcha failed:", err);
     return false;
   }
 }
 async function sendPhoneOTP(phone) {
-  {
+  if (!firebaseAuth || !recaptchaVerifier) {
     return { success: false, error: "Firebase not ready. Configure VITE_FIREBASE_* env vars." };
+  }
+  const formattedPhone = formatTZPhone(phone);
+  try {
+    confirmationResult = await signInWithPhoneNumber(firebaseAuth, formattedPhone, recaptchaVerifier);
+    return { success: true };
+  } catch (err) {
+    console.error("sendPhoneOTP error:", err);
+    const code = err.code || "";
+    if (code === "auth/invalid-phone-number") return { success: false, error: "Namba ya simu si sahihi / Invalid phone number" };
+    if (code === "auth/too-many-requests") return { success: false, error: "Maombi mengi sana. Jaribu tena baadaye / Too many requests. Try later" };
+    if (code === "auth/quota-exceeded") return { success: false, error: "Kiwango cha SMS kimezidi / SMS quota exceeded" };
+    return { success: false, error: err.message || "Failed to send OTP" };
   }
 }
 async function verifyPhoneOTP(code) {
@@ -88,6 +120,10 @@ async function syncFirebaseUserToSupabase(firebaseUid, phone) {
   }
 }
 function cleanupRecaptcha() {
+  if (recaptchaVerifier) {
+    recaptchaVerifier.clear();
+    recaptchaVerifier = null;
+  }
   confirmationResult = null;
 }
 export {
