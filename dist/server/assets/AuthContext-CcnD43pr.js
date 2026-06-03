@@ -74,16 +74,25 @@ const AuthProvider = ({ children }) => {
         if (!isMounted) return;
         setSession(currentSession);
         if (currentSession?.user) {
-          const profile = await withProfileTimeout(fetchUserProfile(currentSession.user.id));
-          if (!isMounted) return;
-          setUser(profile ?? buildFallbackUser(currentSession.user));
+          setUser(buildFallbackUser(currentSession.user));
+          try {
+            const profile = await withProfileTimeout(fetchUserProfile(currentSession.user.id));
+            if (!isMounted) return;
+            if (profile) setUser(profile);
+          } catch (profileErr) {
+            console.warn("[Auth] Profile fetch failed, keeping fallback user:", profileErr);
+          }
         } else {
           setUser(null);
         }
       } catch (error) {
         if (!isMounted) return;
-        setSession(null);
-        setUser(null);
+        console.error("[Auth] Session init error:", error);
+        const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+        if (!data?.session) {
+          setSession(null);
+          setUser(null);
+        }
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -91,19 +100,28 @@ const AuthProvider = ({ children }) => {
       }
     };
     initializeSession();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log("[Auth] State change:", event, !!newSession);
+      if (event === "SIGNED_OUT") {
+        setSession(null);
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
       if (newSession?.user) {
-        setUser(buildFallbackUser(newSession.user));
+        setSession(newSession);
+        setUser((prev) => prev || buildFallbackUser(newSession.user));
         setTimeout(() => {
           void withProfileTimeout(fetchUserProfile(newSession.user.id)).then((profile) => {
             if (isMounted && profile) setUser(profile);
           });
         }, 0);
-      } else {
+        setIsLoading(false);
+      } else if (event !== "TOKEN_REFRESHED") {
+        setSession(null);
         setUser(null);
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
     return () => {
       isMounted = false;

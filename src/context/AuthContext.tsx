@@ -112,16 +112,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setSession(currentSession);
         if (currentSession?.user) {
-          const profile = await withProfileTimeout(fetchUserProfile(currentSession.user.id));
-          if (!isMounted) return;
-          setUser(profile ?? buildFallbackUser(currentSession.user));
+          // Set fallback user immediately so dashboard renders
+          setUser(buildFallbackUser(currentSession.user));
+          // Then try to fetch full profile in background
+          try {
+            const profile = await withProfileTimeout(fetchUserProfile(currentSession.user.id));
+            if (!isMounted) return;
+            if (profile) setUser(profile);
+            // If profile is null, keep fallback user — don't logout
+          } catch (profileErr) {
+            console.warn('[Auth] Profile fetch failed, keeping fallback user:', profileErr);
+            // Keep the fallback user — don't clear session
+          }
         } else {
           setUser(null);
         }
       } catch (error) {
         if (!isMounted) return;
-        setSession(null);
-        setUser(null);
+        console.error('[Auth] Session init error:', error);
+        // Only clear if we truly have no session
+        const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+        if (!data?.session) {
+          setSession(null);
+          setUser(null);
+        }
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -131,19 +145,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession: Session | null) => {
-      setSession(newSession);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession: Session | null) => {
+      console.log('[Auth] State change:', event, !!newSession);
+
+      // Only clear user on explicit sign out — not on transient events
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      // For all other events (SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION)
       if (newSession?.user) {
-        setUser(buildFallbackUser(newSession.user));
+        setSession(newSession);
+        setUser(prev => prev || buildFallbackUser(newSession.user));
         setTimeout(() => {
           void withProfileTimeout(fetchUserProfile(newSession.user.id)).then((profile) => {
             if (isMounted && profile) setUser(profile);
           });
         }, 0);
-      } else {
+        setIsLoading(false);
+      } else if (event !== 'TOKEN_REFRESHED') {
+        // Only clear on non-refresh events with no session
+        setSession(null);
         setUser(null);
+        setIsLoading(false);
       }
-      setIsLoading(false);
+      // For TOKEN_REFRESHED with null session — do nothing, keep current state
+      // This prevents logout during brief token refresh windows
     });
 
     return () => {

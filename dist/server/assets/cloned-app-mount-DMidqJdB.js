@@ -23,9 +23,9 @@ function ClonedApp() {
   useEffect(() => {
     let cancelled = false;
     installBrowserPolyfills().then(() => Promise.all([
-      import("./clone-app-B4U7C8yP.js"),
+      import("./clone-app-FSZ-2uyv.js"),
       import("./LanguageContext-CxZn693q.js"),
-      import("./AuthContext-Dat9LlRJ.js").then((n) => n.A),
+      import("./AuthContext-CcnD43pr.js").then((n) => n.A),
       import("./ToastContext-CEX5a5jr.js")
     ]).then(([app, lang, auth, toast]) => {
       if (cancelled) return;
