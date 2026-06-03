@@ -135,9 +135,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(newSession);
       if (newSession?.user) {
         setUser(buildFallbackUser(newSession.user));
-        void withProfileTimeout(fetchUserProfile(newSession.user.id)).then((profile) => {
-          if (isMounted && profile) setUser(profile);
-        });
+        setTimeout(() => {
+          void withProfileTimeout(fetchUserProfile(newSession.user.id)).then((profile) => {
+            if (isMounted && profile) setUser(profile);
+          });
+        }, 0);
       } else {
         setUser(null);
       }
