@@ -58,9 +58,9 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.confirmNewPassword': 'Confirm New Password',
     
     // Errors
-    'error.notConfigured': 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.',
-    'error.cannotReachServer': 'Cannot reach Supabase. Check your internet connection or resume your project at app.supabase.com.',
-    'error.invalidApiKey': 'Configuration error: Invalid API key. Check your .env file.',
+    'error.notConfigured': 'Backend is not configured. Please check the project settings.',
+    'error.cannotReachServer': 'The sign-in service did not respond in time. Please try again in a moment.',
+    'error.invalidApiKey': 'Configuration error: invalid backend key.',
     'error.failed': 'Operation failed. Please try again.',
     'error.tryAgain': 'Please try again.',
     
@@ -217,9 +217,9 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.confirmNewPassword': 'Thibitisha Nywila Mpya',
     
     // Errors
-    'error.notConfigured': 'Mfumo wa Supabase haujasanidiwa. Weka VITE_SUPABASE_URL na VITE_SUPABASE_ANON_KEY kwenye .env.',
-    'error.cannotReachServer': 'Seva ya Supabase haipatikani. Angalia muunganisho wa intaneti yako au uanzishe tena mradi wako kwenye app.supabase.com.',
-    'error.invalidApiKey': 'Hitilafu ya usanidi: API key si sahihi. Angalia faili yako ya .env.',
+    'error.notConfigured': 'Backend haijasanidiwa. Tafadhali kagua mipangilio ya mradi.',
+    'error.cannotReachServer': 'Huduma ya kuingia haikujibu kwa wakati. Tafadhali jaribu tena baada ya muda mfupi.',
+    'error.invalidApiKey': 'Hitilafu ya usanidi: ufunguo wa backend si sahihi.',
     'error.failed': 'Operesheni haikufaulu. Tafadhali jaribu tena.',
     'error.tryAgain': 'Tafadhali jaribu tena.',
     
