@@ -38,21 +38,22 @@ const AuthProvider = ({ children }) => {
     try {
       const { data, error } = await supabase.from("users").select("*").eq("id", userId).maybeSingle();
       if (error) {
-        console.error("Error fetching user profile:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          userId
-        });
+        console.warn("[Auth] Profile fetch error (may be RLS):", error.message);
+        try {
+          const { data: rpcData } = await supabase.rpc("get_user_profile", { p_user_id: userId });
+          if (rpcData && rpcData.length > 0) return rpcData[0];
+        } catch (rpcErr) {
+          console.warn("[Auth] RPC fallback also failed:", rpcErr);
+        }
         return null;
       }
       if (!data) {
+        console.warn("[Auth] No profile row for user", userId, "— will use fallback");
         return null;
       }
       return data;
     } catch (error) {
-      console.error("Error fetching user profile:", error);
+      console.error("[Auth] fetchUserProfile exception:", error);
       return null;
     }
   };

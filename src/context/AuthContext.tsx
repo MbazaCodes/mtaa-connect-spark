@@ -60,23 +60,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       if (error) {
-        console.error('Error fetching user profile:', {
-          code: (error as any).code,
-          message: error.message,
-          details: (error as any).details,
-          hint: (error as any).hint,
-          userId,
-        });
+        console.warn('[Auth] Profile fetch error (may be RLS):', error.message);
+        // If RLS blocks the read, try using the RPC instead
+        try {
+          const { data: rpcData } = await supabase.rpc('get_user_profile', { p_user_id: userId });
+          if (rpcData && rpcData.length > 0) return rpcData[0] as UserProfile;
+        } catch (rpcErr) {
+          console.warn('[Auth] RPC fallback also failed:', rpcErr);
+        }
         return null;
       }
 
       if (!data) {
+        console.warn('[Auth] No profile row for user', userId, '— will use fallback');
         return null;
       }
 
       return data as UserProfile;
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('[Auth] fetchUserProfile exception:', error);
       return null;
     }
   };

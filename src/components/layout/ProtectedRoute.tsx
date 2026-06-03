@@ -10,22 +10,28 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, session } = useAuth();
   const navigate = useNavigate();
+  const [graceExpired, setGraceExpired] = React.useState(false);
+
+  // Give auth 2 seconds to settle before redirecting
+  React.useEffect(() => {
+    const timer = setTimeout(() => setGraceExpired(true), 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
-    if (isLoading) return;
-    if (!user) { navigate('/'); return; }
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
-      // Redirect to the role's default home
+    if (isLoading || !graceExpired) return;
+    if (!user && !session) { navigate('/'); return; }
+    if (user && allowedRoles && !allowedRoles.includes(user.role)) {
       if (user.role === 'admin') navigate('/admin');
       else if (user.role === 'staff') navigate('/staff');
       else navigate('/dashboard');
     }
-  }, [user, isLoading, allowedRoles, navigate]);
+  }, [user, session, isLoading, allowedRoles, navigate, graceExpired]);
 
-  if (isLoading) return null;
-  if (!user) return null;
-  if (allowedRoles && !allowedRoles.includes(user.role)) return null;
+  if (isLoading || !graceExpired) return null;
+  if (!user && !session) return null;
+  if (user && allowedRoles && !allowedRoles.includes(user.role)) return null;
   return <>{children}</>;
 };

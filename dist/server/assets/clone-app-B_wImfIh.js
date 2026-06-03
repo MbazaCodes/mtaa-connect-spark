@@ -2,7 +2,7 @@ import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import React, { useState, useCallback, useEffect, createContext, useContext, useMemo, useRef, useLayoutEffect } from "react";
 import { useNavigate, useLocation, useSearchParams, BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { s as supabase, u as useAuth, I as IS_SUPABASE_CONFIGURED } from "./AuthContext-CcnD43pr.js";
+import { s as supabase, u as useAuth, I as IS_SUPABASE_CONFIGURED } from "./AuthContext-CfeE5G_w.js";
 import { useLanguage } from "./LanguageContext-CxZn693q.js";
 import { useToast } from "./ToastContext-CEX5a5jr.js";
 import { Menu, Bell, Loader2, LogOut, LayoutDashboard, Plus, FileText, Shield, Eye, Users, Building2, MapPin, Settings, Activity, HelpCircle, UserCheck, Search, User, X, Smartphone, ChevronRight, CreditCard, ArrowRight, ShieldCheck, CheckCircle2, FileCheck2, Users2, Clock, Globe2, Home, ArrowLeft, XCircle, RefreshCw, Scale, CheckCircle, Briefcase, Star, Lock, UserPlus, AlertCircle, Upload, FileCheck, Check, Zap, Camera, Info, Globe, Droplet, Hash, Key, Heart, Baby, Trash2, Edit2, Calendar, Phone, Music, Hammer, Wrench, FileSignature, UserX, ReceiptText, HeartHandshake, HandCoins, DollarSign, Gavel, Megaphone, ShieldAlert, Download, Filter, ArrowUpDown, Receipt, Store, CheckCheck, BellOff, Mail, Map as Map$1, BookOpen, Award, EyeOff, Flag, Fingerprint, Navigation, AlertTriangle, Church, FileImage, Save, BadgeCheck, Plane, Vote, Car, Wallet, QrCode, ChevronDown, TrendingUp, Database, ClipboardCheck, BarChart3, Percent, PieChart, ArrowUpRight, ToggleRight, ToggleLeft, PlusCircle, Layers, MinusCircle, Terminal, Copy, ChevronLeft, Printer, Laptop, MoreVertical, ThumbsUp, MessageSquare, ExternalLink, DatabaseZap, Banknote, Inbox, ListFilter, Send } from "lucide-react";
@@ -1934,23 +1934,28 @@ const AppShell = ({ children }) => {
   ] });
 };
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, session } = useAuth();
   const navigate = useNavigate();
+  const [graceExpired, setGraceExpired] = React.useState(false);
+  React.useEffect(() => {
+    const timer = setTimeout(() => setGraceExpired(true), 2e3);
+    return () => clearTimeout(timer);
+  }, []);
   useEffect(() => {
-    if (isLoading) return;
-    if (!user) {
+    if (isLoading || !graceExpired) return;
+    if (!user && !session) {
       navigate("/");
       return;
     }
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
+    if (user && allowedRoles && !allowedRoles.includes(user.role)) {
       if (user.role === "admin") navigate("/admin");
       else if (user.role === "staff") navigate("/staff");
       else navigate("/dashboard");
     }
-  }, [user, isLoading, allowedRoles, navigate]);
-  if (isLoading) return null;
-  if (!user) return null;
-  if (allowedRoles && !allowedRoles.includes(user.role)) return null;
+  }, [user, session, isLoading, allowedRoles, navigate, graceExpired]);
+  if (isLoading || !graceExpired) return null;
+  if (!user && !session) return null;
+  if (user && allowedRoles && !allowedRoles.includes(user.role)) return null;
   return /* @__PURE__ */ jsx(Fragment, { children });
 };
 function Landing({ onShowAuth, onShowVerify }) {
