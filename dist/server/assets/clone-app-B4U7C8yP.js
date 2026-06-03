@@ -19922,122 +19922,6 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
       setLoading(false);
     }
   };
-  const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: window.location.origin
-      }
-    });
-    if (error) showToast(error.message ?? "Error", "error");
-  };
-  const handleAppleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "apple",
-      options: {
-        redirectTo: window.location.origin
-      }
-    });
-    if (error) showToast(error.message ?? "Error", "error");
-  };
-  const handleSendPhoneOtp = async () => {
-    const phone = otpPhone.trim();
-    if (!phone || phone.length < 9) {
-      showToast(lang === "sw" ? "Ingiza namba sahihi ya simu" : "Enter a valid phone number", "error");
-      return;
-    }
-    setOtpLoading(true);
-    try {
-      const { isFirebaseConfigured } = await import("./firebase-Czw1M5xv.js");
-      if (isFirebaseConfigured) {
-        const { setupRecaptcha, sendPhoneOTP, formatTZPhone } = await import("./firebaseAuth-B43a6Gm4.js");
-        const formatted = formatTZPhone(phone);
-        setOtpPhone(formatted);
-        setupRecaptcha("phone-otp-send-btn");
-        const result = await sendPhoneOTP(formatted);
-        if (!result.success) throw new Error(result.error);
-        setOtpSent(true);
-        showToast(lang === "sw" ? `OTP imetumwa kwa ${formatted}` : `OTP sent to ${formatted}`, "success");
-      } else {
-        const formatted = phone.startsWith("+") ? phone : phone.startsWith("0") ? `+255${phone.slice(1)}` : `+255${phone}`;
-        setOtpPhone(formatted);
-        const { error } = await supabase.auth.signInWithOtp({ phone: formatted });
-        if (error) throw error;
-        setOtpSent(true);
-        showToast(lang === "sw" ? `OTP imetumwa kwa ${formatted}` : `OTP sent to ${formatted}`, "success");
-      }
-    } catch (err) {
-      showToast(err.message || "Failed to send OTP", "error");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-  const handleSendEmailOtp = async () => {
-    const emailAddr = otpEmail.trim();
-    if (!emailAddr || !/\S+@\S+\.\S+/.test(emailAddr)) {
-      showToast(lang === "sw" ? "Ingiza barua pepe sahihi" : "Enter a valid email address", "error");
-      return;
-    }
-    setOtpLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({ email: emailAddr });
-      if (error) throw error;
-      setOtpSent(true);
-      showToast(lang === "sw" ? `OTP imetumwa kwa ${emailAddr}` : `OTP sent to ${emailAddr}`, "success");
-    } catch (err) {
-      showToast(err.message || "Failed to send OTP", "error");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-  const handleVerifyOtp = async () => {
-    if (!otpCode.trim() || otpCode.length < 6) {
-      showToast(lang === "sw" ? "Ingiza namba 6 za OTP" : "Enter the 6-digit OTP code", "error");
-      return;
-    }
-    setOtpLoading(true);
-    try {
-      if (otpMode === "phone") {
-        const { isFirebaseConfigured } = await import("./firebase-Czw1M5xv.js");
-        if (isFirebaseConfigured) {
-          const { verifyPhoneOTP, syncFirebaseUserToSupabase } = await import("./firebaseAuth-B43a6Gm4.js");
-          const result = await verifyPhoneOTP(otpCode);
-          if (!result.success) throw new Error(result.error);
-          const sync = await syncFirebaseUserToSupabase(result.firebaseUid, result.phone);
-          if (!sync.success) throw new Error(sync.error);
-          if (sync.isNew) {
-            showToast(lang === "sw" ? "Akaunti mpya imeundwa! Tafadhali kamilisha wasifu wako." : "New account created! Please complete your profile.", "success");
-          } else {
-            showToast(lang === "sw" ? "Umeingia kwa mafanikio!" : "Logged in successfully!", "success");
-          }
-          const tempEmail = `phone_${(result.phone || "").replace(/\+/g, "")}@emtaa.tz`;
-          const tempPass = `Firebase_${(result.firebaseUid || "").slice(0, 16)}!`;
-          await supabase.auth.signInWithPassword({ email: tempEmail, password: tempPass });
-        } else {
-          const { error } = await supabase.auth.verifyOtp({ phone: otpPhone, token: otpCode, type: "sms" });
-          if (error) throw error;
-          showToast(lang === "sw" ? "Umeingia kwa mafanikio!" : "Logged in successfully!", "success");
-        }
-      } else {
-        const { error } = await supabase.auth.verifyOtp({ email: otpEmail, token: otpCode, type: "email" });
-        if (error) throw error;
-        showToast(lang === "sw" ? "Umeingia kwa mafanikio!" : "Logged in successfully!", "success");
-      }
-    } catch (err) {
-      showToast(err.message || (lang === "sw" ? "OTP si sahihi" : "Invalid OTP code"), "error");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-  const resetOtp = () => {
-    setOtpMode("none");
-    setOtpPhone("");
-    setOtpEmail("");
-    setOtpCode("");
-    setOtpSent(false);
-    import("./firebaseAuth-B43a6Gm4.js").then((m) => m.cleanupRecaptcha()).catch(() => {
-    });
-  };
   const handleVerifySecurity = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -20375,21 +20259,22 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
                   /* @__PURE__ */ jsx("span", { className: "text-xs font-bold text-stone-400 uppercase tracking-wider", children: lang === "sw" ? "au endelea na" : "or continue with" }),
                   /* @__PURE__ */ jsx("div", { className: "flex-1 h-px bg-stone-200" })
                 ] }),
-                /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+                /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3 opacity-50", children: [
                   /* @__PURE__ */ jsxs(
                     "button",
                     {
                       type: "button",
-                      onClick: handleGoogleLogin,
-                      className: "h-12 bg-white border-2 border-stone-200 rounded-xl font-bold text-sm text-stone-700 hover:bg-stone-50 hover:border-stone-300 transition-all flex items-center justify-center gap-2.5",
+                      disabled: true,
+                      className: "h-12 bg-white border-2 border-stone-200 rounded-xl font-bold text-sm text-stone-400 cursor-not-allowed flex items-center justify-center gap-2.5 relative",
                       children: [
                         /* @__PURE__ */ jsxs("svg", { width: "18", height: "18", viewBox: "0 0 24 24", children: [
-                          /* @__PURE__ */ jsx("path", { d: "M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z", fill: "#4285F4" }),
-                          /* @__PURE__ */ jsx("path", { d: "M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z", fill: "#34A853" }),
-                          /* @__PURE__ */ jsx("path", { d: "M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z", fill: "#FBBC05" }),
-                          /* @__PURE__ */ jsx("path", { d: "M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z", fill: "#EA4335" })
+                          /* @__PURE__ */ jsx("path", { d: "M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z", fill: "#ccc" }),
+                          /* @__PURE__ */ jsx("path", { d: "M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z", fill: "#ccc" }),
+                          /* @__PURE__ */ jsx("path", { d: "M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z", fill: "#ccc" }),
+                          /* @__PURE__ */ jsx("path", { d: "M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z", fill: "#ccc" })
                         ] }),
-                        "Google"
+                        "Google",
+                        /* @__PURE__ */ jsx("span", { className: "absolute -top-2 -right-2 bg-amber-400 text-[8px] text-white font-black px-1.5 py-0.5 rounded-full", children: lang === "sw" ? "Hivi Karibuni" : "Soon" })
                       ]
                     }
                   ),
@@ -20397,26 +20282,28 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
                     "button",
                     {
                       type: "button",
-                      onClick: handleAppleLogin,
-                      className: "h-12 bg-black border-2 border-black rounded-xl font-bold text-sm text-white hover:bg-stone-800 transition-all flex items-center justify-center gap-2.5",
+                      disabled: true,
+                      className: "h-12 bg-stone-300 border-2 border-stone-300 rounded-xl font-bold text-sm text-white cursor-not-allowed flex items-center justify-center gap-2.5 relative",
                       children: [
                         /* @__PURE__ */ jsx("svg", { width: "16", height: "18", viewBox: "0 0 17 20", fill: "white", children: /* @__PURE__ */ jsx("path", { d: "M13.545 10.239c-.021-2.088 1.704-3.092 1.782-3.141-0.97-1.418-2.482-1.612-3.02-1.634-1.285-.13-2.509.756-3.162.756-.652 0-1.662-.737-2.731-.718-1.406.02-2.703.817-3.427 2.076-1.461 2.534-.374 6.292 1.05 8.348.696 1.006 1.525 2.136 2.614 2.095 1.049-.042 1.445-.679 2.714-.679 1.269 0 1.625.679 2.731.658 1.128-.019 1.843-1.024 2.534-2.033.799-1.166 1.128-2.294 1.148-2.352-.025-.011-2.203-.846-2.225-3.356zM11.483 3.492c.578-.702.969-1.676.862-2.647-.832.034-1.841.554-2.438 1.253-.535.619-1.004 1.607-.878 2.555.929.072 1.878-.472 2.454-1.161z" }) }),
-                        "Apple"
+                        "Apple",
+                        /* @__PURE__ */ jsx("span", { className: "absolute -top-2 -right-2 bg-amber-400 text-[8px] text-white font-black px-1.5 py-0.5 rounded-full", children: lang === "sw" ? "Hivi Karibuni" : "Soon" })
                       ]
                     }
                   )
                 ] }),
-                otpMode === "none" ? /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+                /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3 opacity-50", children: [
                   /* @__PURE__ */ jsxs(
                     "button",
                     {
                       type: "button",
-                      onClick: () => setOtpMode("phone"),
-                      className: "h-12 bg-emerald-50 border-2 border-emerald-200 rounded-xl font-bold text-sm text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 transition-all flex items-center justify-center gap-2",
+                      disabled: true,
+                      className: "h-12 bg-emerald-50 border-2 border-stone-200 rounded-xl font-bold text-sm text-stone-400 cursor-not-allowed flex items-center justify-center gap-2 relative",
                       children: [
                         /* @__PURE__ */ jsx(Phone, { size: 16 }),
                         " ",
-                        lang === "sw" ? "SMS OTP" : "Phone OTP"
+                        lang === "sw" ? "SMS OTP" : "Phone OTP",
+                        /* @__PURE__ */ jsx("span", { className: "absolute -top-2 -right-2 bg-amber-400 text-[8px] text-white font-black px-1.5 py-0.5 rounded-full", children: lang === "sw" ? "Hivi Karibuni" : "Soon" })
                       ]
                     }
                   ),
@@ -20424,106 +20311,16 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
                     "button",
                     {
                       type: "button",
-                      onClick: () => setOtpMode("email"),
-                      className: "h-12 bg-blue-50 border-2 border-blue-200 rounded-xl font-bold text-sm text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-all flex items-center justify-center gap-2",
+                      disabled: true,
+                      className: "h-12 bg-blue-50 border-2 border-stone-200 rounded-xl font-bold text-sm text-stone-400 cursor-not-allowed flex items-center justify-center gap-2 relative",
                       children: [
                         /* @__PURE__ */ jsx(Mail, { size: 16 }),
                         " ",
-                        lang === "sw" ? "Email OTP" : "Email OTP"
+                        lang === "sw" ? "Email OTP" : "Email OTP",
+                        /* @__PURE__ */ jsx("span", { className: "absolute -top-2 -right-2 bg-amber-400 text-[8px] text-white font-black px-1.5 py-0.5 rounded-full", children: lang === "sw" ? "Hivi Karibuni" : "Soon" })
                       ]
                     }
                   )
-                ] }) : /* @__PURE__ */ jsxs("div", { className: "bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3", children: [
-                  /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
-                    /* @__PURE__ */ jsx("p", { className: "text-xs font-bold text-stone-600 uppercase tracking-wider flex items-center gap-1.5", children: otpMode === "phone" ? /* @__PURE__ */ jsxs(Fragment, { children: [
-                      /* @__PURE__ */ jsx(Phone, { size: 13 }),
-                      " ",
-                      lang === "sw" ? "Ingia kwa SMS" : "Login via SMS"
-                    ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-                      /* @__PURE__ */ jsx(Mail, { size: 13 }),
-                      " ",
-                      lang === "sw" ? "Ingia kwa Email OTP" : "Login via Email OTP"
-                    ] }) }),
-                    /* @__PURE__ */ jsx("button", { type: "button", onClick: resetOtp, className: "text-xs text-stone-400 hover:text-stone-600 font-bold", "aria-label": "Close OTP", children: "✕" })
-                  ] }),
-                  !otpSent ? /* @__PURE__ */ jsxs(Fragment, { children: [
-                    otpMode === "phone" ? /* @__PURE__ */ jsx(
-                      "input",
-                      {
-                        type: "tel",
-                        value: otpPhone,
-                        onChange: (e) => setOtpPhone(e.target.value),
-                        placeholder: "+255 7XX XXX XXX",
-                        "aria-label": "Phone number",
-                        className: "w-full h-12 px-4 bg-white border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm font-mono"
-                      }
-                    ) : /* @__PURE__ */ jsx(
-                      "input",
-                      {
-                        type: "email",
-                        value: otpEmail,
-                        onChange: (e) => setOtpEmail(e.target.value),
-                        placeholder: "juma@example.com",
-                        "aria-label": "Email address",
-                        className: "w-full h-12 px-4 bg-white border border-stone-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
-                      }
-                    ),
-                    /* @__PURE__ */ jsxs(
-                      "button",
-                      {
-                        type: "button",
-                        disabled: otpLoading,
-                        id: "phone-otp-send-btn",
-                        onClick: otpMode === "phone" ? handleSendPhoneOtp : handleSendEmailOtp,
-                        className: `w-full h-11 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${otpMode === "phone" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blue-600 hover:bg-blue-700"}`,
-                        children: [
-                          otpLoading ? /* @__PURE__ */ jsx(Loader2, { size: 16, className: "animate-spin" }) : null,
-                          lang === "sw" ? "Tuma OTP" : "Send OTP"
-                        ]
-                      }
-                    )
-                  ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-                    /* @__PURE__ */ jsx("p", { className: "text-xs text-stone-500", children: otpMode === "phone" ? lang === "sw" ? `Namba 6 za OTP zimetumwa kwa ${otpPhone}` : `6-digit OTP sent to ${otpPhone}` : lang === "sw" ? `Namba 6 za OTP zimetumwa kwa ${otpEmail}` : `6-digit OTP sent to ${otpEmail}` }),
-                    /* @__PURE__ */ jsx(
-                      "input",
-                      {
-                        type: "text",
-                        value: otpCode,
-                        onChange: (e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6)),
-                        placeholder: "000000",
-                        maxLength: 6,
-                        "aria-label": "OTP code",
-                        className: "w-full h-14 px-4 bg-white border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-center text-2xl font-mono font-bold tracking-[0.5em]"
-                      }
-                    ),
-                    /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
-                      /* @__PURE__ */ jsx(
-                        "button",
-                        {
-                          type: "button",
-                          onClick: () => {
-                            setOtpSent(false);
-                            setOtpCode("");
-                          },
-                          className: "flex-1 h-11 bg-stone-100 text-stone-600 rounded-xl font-bold text-xs hover:bg-stone-200",
-                          children: lang === "sw" ? "Tuma Tena" : "Resend"
-                        }
-                      ),
-                      /* @__PURE__ */ jsxs(
-                        "button",
-                        {
-                          type: "button",
-                          disabled: otpLoading || otpCode.length < 6,
-                          onClick: handleVerifyOtp,
-                          className: "flex-[2] h-11 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2",
-                          children: [
-                            otpLoading ? /* @__PURE__ */ jsx(Loader2, { size: 14, className: "animate-spin" }) : /* @__PURE__ */ jsx(CheckCircle2, { size: 14 }),
-                            lang === "sw" ? "Thibitisha" : "Verify"
-                          ]
-                        }
-                      )
-                    ] })
-                  ] })
                 ] }),
                 /* @__PURE__ */ jsx("div", { className: "text-center", children: /* @__PURE__ */ jsxs("p", { className: "text-sm text-stone-500", children: [
                   lang === "sw" ? "Hauna akaunti?" : "Don't have an account?",
@@ -21366,21 +21163,22 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
                         /* @__PURE__ */ jsx("span", { className: "text-xs font-bold text-stone-400 uppercase tracking-wider", children: lang === "sw" ? "au jisajili na" : "or sign up with" }),
                         /* @__PURE__ */ jsx("div", { className: "flex-1 h-px bg-stone-200" })
                       ] }),
-                      /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+                      /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3 opacity-50", children: [
                         /* @__PURE__ */ jsxs(
                           "button",
                           {
                             type: "button",
-                            onClick: handleGoogleLogin,
-                            className: "h-12 bg-white border-2 border-stone-200 rounded-xl font-bold text-sm text-stone-700 hover:bg-stone-50 hover:border-stone-300 transition-all flex items-center justify-center gap-2.5",
+                            disabled: true,
+                            className: "h-12 bg-white border-2 border-stone-200 rounded-xl font-bold text-sm text-stone-400 cursor-not-allowed flex items-center justify-center gap-2.5 relative",
                             children: [
                               /* @__PURE__ */ jsxs("svg", { width: "18", height: "18", viewBox: "0 0 24 24", children: [
-                                /* @__PURE__ */ jsx("path", { d: "M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z", fill: "#4285F4" }),
-                                /* @__PURE__ */ jsx("path", { d: "M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z", fill: "#34A853" }),
-                                /* @__PURE__ */ jsx("path", { d: "M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z", fill: "#FBBC05" }),
-                                /* @__PURE__ */ jsx("path", { d: "M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z", fill: "#EA4335" })
+                                /* @__PURE__ */ jsx("path", { d: "M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z", fill: "#ccc" }),
+                                /* @__PURE__ */ jsx("path", { d: "M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z", fill: "#ccc" }),
+                                /* @__PURE__ */ jsx("path", { d: "M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z", fill: "#ccc" }),
+                                /* @__PURE__ */ jsx("path", { d: "M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z", fill: "#ccc" })
                               ] }),
-                              "Google"
+                              "Google",
+                              /* @__PURE__ */ jsx("span", { className: "absolute -top-2 -right-2 bg-amber-400 text-[8px] text-white font-black px-1.5 py-0.5 rounded-full", children: lang === "sw" ? "Hivi Karibuni" : "Soon" })
                             ]
                           }
                         ),
@@ -21388,11 +21186,12 @@ function Auth({ mode, onClose, setMode, isDiaspora = false }) {
                           "button",
                           {
                             type: "button",
-                            onClick: handleAppleLogin,
-                            className: "h-12 bg-black border-2 border-black rounded-xl font-bold text-sm text-white hover:bg-stone-800 transition-all flex items-center justify-center gap-2.5",
+                            disabled: true,
+                            className: "h-12 bg-stone-300 border-2 border-stone-300 rounded-xl font-bold text-sm text-white cursor-not-allowed flex items-center justify-center gap-2.5 relative",
                             children: [
                               /* @__PURE__ */ jsx("svg", { width: "16", height: "18", viewBox: "0 0 17 20", fill: "white", children: /* @__PURE__ */ jsx("path", { d: "M13.545 10.239c-.021-2.088 1.704-3.092 1.782-3.141-0.97-1.418-2.482-1.612-3.02-1.634-1.285-.13-2.509.756-3.162.756-.652 0-1.662-.737-2.731-.718-1.406.02-2.703.817-3.427 2.076-1.461 2.534-.374 6.292 1.05 8.348.696 1.006 1.525 2.136 2.614 2.095 1.049-.042 1.445-.679 2.714-.679 1.269 0 1.625.679 2.731.658 1.128-.019 1.843-1.024 2.534-2.033.799-1.166 1.128-2.294 1.148-2.352-.025-.011-2.203-.846-2.225-3.356zM11.483 3.492c.578-.702.969-1.676.862-2.647-.832.034-1.841.554-2.438 1.253-.535.619-1.004 1.607-.878 2.555.929.072 1.878-.472 2.454-1.161z" }) }),
-                              "Apple"
+                              "Apple",
+                              /* @__PURE__ */ jsx("span", { className: "absolute -top-2 -right-2 bg-amber-400 text-[8px] text-white font-black px-1.5 py-0.5 rounded-full", children: lang === "sw" ? "Hivi Karibuni" : "Soon" })
                             ]
                           }
                         )
