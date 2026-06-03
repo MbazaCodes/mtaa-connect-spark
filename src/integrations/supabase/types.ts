@@ -1252,6 +1252,37 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_citizen_profile: {
+        Args: {
+          p_country_of_citizenship?: string
+          p_country_of_residence?: string
+          p_date_of_birth?: string
+          p_district?: string
+          p_education_level?: string
+          p_email?: string
+          p_first_name: string
+          p_gender?: string
+          p_id: string
+          p_id_number?: string
+          p_id_type?: string
+          p_is_diaspora?: boolean
+          p_is_verified?: boolean
+          p_last_name?: string
+          p_marital_status?: string
+          p_middle_name?: string
+          p_nationality?: string
+          p_nida_number?: string
+          p_occupation?: string
+          p_passport_number?: string
+          p_phone?: string
+          p_place_of_birth?: string
+          p_region?: string
+          p_sex?: string
+          p_street?: string
+          p_ward?: string
+        }
+        Returns: undefined
+      }
       generate_citizen_id: { Args: never; Returns: string }
       get_user_profile: {
         Args: { user_id: string }
@@ -1272,6 +1303,7 @@ export type Database = {
       get_user_role_safe: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_admin_or_staff: { Args: never; Returns: boolean }
+      is_staff_or_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       application_status:
